@@ -9,22 +9,42 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+# El Paso Bus Network Analysis
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r}
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(tigris)
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
 
-```{r cars}
-summary(cars)
 ```
 
-## Including Plots
+```{r}
+censusvars <- c("B01001_001E", # ACS total Pop estimate
+              "B25002_001E", # Estimate of total housing units
+              "B25002_003E", # Number of vacant housing units
+              "B19013_001E", # Median HH Income ($)
+              "B02001_002E", # People describing themselves as "white alone"
+              "B06009_006E") #
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+elpaso <- get_acs(geography = "tract",
+                             year = 2020, 
+                             variables = censusvars, 
+                             geometry = T,
+                             state = "TX", 
+                             county = "El Paso", 
+                             output = "wide") 
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+ggplot()+
+  geom_sf(data = elpaso)
+```
+
+
+
