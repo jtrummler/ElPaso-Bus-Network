@@ -1,30 +1,34 @@
 ---
-title: "ElPaso_bus"
-author: "Charlie Huemmler"
+title: "Planning and Forecasting Bus Transit Alternatives in El Paso, Texas"
+author: "Charlie Huemmler, Yingxue Ou, Jack Rummler"
 date: "2023-01-17"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(sf)
+library(RSocrata)
+library(viridis)
+library(spatstat)
+library(raster)
+library(spdep)
+library(FNN)
+library(grid)
+library(gridExtra)
+library(knitr)
+library(kableExtra)
+library(tidycensus)
+library(classInt)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+root.dir = "C:/Users/jtrum/Desktop/MUSA8010/data"
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+jan_to_aug <- read.csv("C:/Users/jtrum/Desktop/MUSA8010/data/total_boardings_2021.csv")
+sep_to_dec <- read.csv("C:/Users/jtrum/Desktop/MUSA8010/data/total_boardings_sept.csv")
+ridership <- join(jan_to_aug, sep_to_dec, by="RT")
 ```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
