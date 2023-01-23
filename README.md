@@ -16,4 +16,4 @@ The use case for our app and forecast is for SunMetro planners. We imagine that 
 
 ## Currently working on
 
-**Familiarizing ourselves with El Paso's spatial 
+** Familiarizing ourselves with El Paso's spatial 
