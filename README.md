@@ -14,10 +14,10 @@ A business as usual approach toward bus transit planning in El Paso follows tren
 
 The use case for our app and forecast is for SunMetro planners. We imagine that planners will be able to select one of the proposed bus routes in our app, and evaluate each individual metric to see how well the route performs. These metrics will be derived from data given on ridership from the agency alongide socioeconomic indicators from the American Community Survey. Ultimately, planners can assess whether the route is efficient under the indicators and are able to decide if the new route should be implemented.
 
-## Currently working on
+## Tasks
 
-*Familiarizing ourselves with El Paso (demographics, economy, culture, etc.) and the SunMetro system (current state of transit, different bus services, etc.)
+(1) Familiarizing ourselves with El Paso (demographics, economy, culture, etc.) and the SunMetro system (current state of transit, different bus services, etc.)
 
-*Exploring data including 2022 ridership data and American Community Survery data
+(2) Exploring data including 2022 ridership data and American Community Survery data
 
-*Wireframing basic ideas for application development
+(3) Wireframing basic ideas for application development
