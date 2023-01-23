@@ -16,4 +16,6 @@ The use case for our app and forecast is for SunMetro planners. We imagine that 
 
 ## Currently working on
 
-*Familiarizing ourselves with El Paso's spatial 
+*Familiarizing ourselves with El Paso (demographics, economy, culture, etc.) and the SunMetro system (current state of transit, different bus services, etc.)*
+*Exploring data including 2022 ridership data and American Community Survery data*
+*Wireframing basic ideas for application development*
