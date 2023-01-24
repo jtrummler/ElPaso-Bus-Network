@@ -1,0 +1,29 @@
+```{r}
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(tigris)
+library(lubridate)
+```
+
+```{r}
+janaug <- read_csv("C:/Users/jtrum/Desktop/MUSA8010/data/total_boardings_2021.csv")
+sepdec <- read_csv("C:/Users/jtrum/Desktop/MUSA8010/data/total_boardings_sept.csv")
+ridership <- rbind(janaug, sepdec)
+```
+
+```{r date-time}
+ridership$Date <- ridership$Date %>% as.character() %>% substring(2) %>% as.Date(format = "%Y%m%d")
+```
+
+```{r}
+stops <- read.csv("C:/Users/jtrum/Desktop/MUSA8010/data/stops.csv")
+
+stops_cols <- c("stop_name", "stop_desc", "stop_lat", "stop_lon")
+
+stops <- stops %>%
+  dplyr::select(all_of(stops_cols))
+
+merge <- 
+
+```
