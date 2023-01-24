@@ -16,8 +16,13 @@ library(sf)
 library(tidyverse)
 library(tidycensus)
 library(tigris)
+library(boxr)
+library(lubridate)
+library(here)
 
 census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
+#box_auth(client_id = "your_client_id", client_secret = "your_client_secret")
+
 
 ```
 
@@ -46,5 +51,15 @@ ggplot()+
   geom_sf(data = elpaso)
 ```
 
+```{r}
+routes <- read_sf('C:/Users/cchue/Documents/Penn MUSA/Spring/Practicum/Data/BusRoutes.shp')
+
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = elpaso)+
+  geom_sf(data = routes, color = 'red')
+```
 
 
