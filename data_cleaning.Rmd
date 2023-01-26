@@ -4,11 +4,12 @@ library(tidyverse)
 library(tidycensus)
 library(tigris)
 library(lubridate)
+library(here)
 ```
 
 ```{r}
-janaug <- read_csv("C:/Users/jtrum/Desktop/MUSA8010/data/total_boardings_2021.csv")
-sepdec <- read_csv("C:/Users/jtrum/Desktop/MUSA8010/data/total_boardings_sept.csv")
+janaug <- read_csv("C:/Users/cchue/Documents/Penn MUSA/Spring/Practicum/Data/totalboardings2021.xlsx")
+
 ridership <- rbind(janaug, sepdec)
 ```
 
