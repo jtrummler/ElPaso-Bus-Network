@@ -5,26 +5,67 @@ library(tidycensus)
 library(tigris)
 library(lubridate)
 library(here)
+options(scipen=999)
 ```
 
 ```{r}
-janaug <- read_csv("C:/Users/cchue/Documents/Penn MUSA/Spring/Practicum/Data/totalboardings2021.xlsx")
+jan <- read_excel(paste(data_folder, "/totalboardings2021.xlsx", sep = ""),
+                                  sheet = "Jan-Aug")
 
-ridership <- rbind(janaug, sepdec)
+
+sep <- read_excel(paste(data_folder, "/totalboardings2021.xlsx", sep = ""),
+                                  sheet = "Sept - Dec")
+
+
+
+ridership <- rbind(jan, sep)
 ```
 
 ```{r date-time}
-ridership$Date <- ridership$Date %>% as.character() %>% substring(2) %>% as.Date(format = "%Y%m%d")
+ridership$Date <- ridership$Date %>% 
+  as.character() %>% 
+  substring(2) %>% 
+  as.Date(format = "%Y%m%d")
+
+# ridership_geom <- st_as_sf(ridership, coords=c('X', 'Y')) %>%
+#   sf::st_set_crs(4326)
 ```
 
 ```{r}
-stops <- read.csv("C:/Users/jtrum/Desktop/MUSA8010/data/stops.csv")
+stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
+```
 
-stops_cols <- c("stop_name", "stop_desc", "stop_lat", "stop_lon")
+```{r}
+# stops_geom <- st_as_sf(stops, coords=c('stop_lat', 'stop_lon')) %>%
+#   sf::st_set_crs(4326)
 
-stops <- stops %>%
-  dplyr::select(all_of(stops_cols))
+rider_stops <- left_join(ridership, stops, by = c('TP' = 'stop_name'))
 
-merge <- 
+na_riderstops <- rider_stops[is.na(rider_stops$stop_lat),]
+na_route <- unique(na_riderstops$TP) 
+print(na_route)
+```
+
+```{r open data and stops}
+opendata_stops <- read_csv("C:/Users/jtrum/Desktop/MUSA8010/data/BusStops.csv")
+
+# od_cols <- c("X", "Y", "Rte")
+# 
+# opendata_stops <- opendata_stops %>%
+#   dplyr::select(all_of(od_cols))
+
+correctProj <- opendata_stops[ opendata_stops$Y <= 32 , ]
+incorrectProj <- opendata_stops[ ! opendata_stops$Y <= 32 , ]
+
+correctProj <- st_as_sf(opendata_stops, coords=c('X', 'Y')) %>%
+  sf::st_set_crs(4326)
+
+correct_geometry <- left_join(rider_stops, correctProj, by = c('stop_lon' = 'X', 'stop_lat' = 'Y'))
+
+```
+
+
+```{r}
+routes <- read_csv("C:/Users/jtrum/Desktop/MUSA8010/data/BusRoutes.csv")
 
 ```
