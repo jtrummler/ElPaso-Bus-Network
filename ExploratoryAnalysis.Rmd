@@ -32,6 +32,9 @@ censusvars <- c("B01001_001E", # ACS total Pop estimate
               "B06009_006E",
               "B01001I_001E", # Hispanic or Latino 
               "B08014_001E",
+              "B09001_002E", # Population under 18
+              "B10052_002E", # Disability
+              "B25075_001E", # House value
               "B08014_002E") # No vehicle available
 
 
@@ -55,12 +58,18 @@ elpaso <- elpaso %>%
     total_White.2020 = B02001_002E,
     total_GradDeg.2020 = B06009_006E,
     total_HL.2020 = B01001I_001E,
-    noV.2020 = B08014_002E
+    noV.2020 = B08014_002E,
+    under18.2020 = B09001_002E,
+    disAb.2020 = B10052_002E,
+    Value = B25075_001E
   ) %>%
     mutate(vacancyPct.2020 = total_vacant.2020/total_HU.2020,
          pctWhite.2020 = total_White.2020/total_pop.2020,
          pctHL.2020 = total_HL.2020/total_pop.2020,
-         pctNV.2020 = noV.2020/total_HU.2020) %>%
+         pctNV.2020 = noV.2020/total_HU.2020*100,
+         pctUnder18.2020 = under18.2020/total_pop.2020,
+         pctDisAb.2020 = disAb.2020/total_pop.2020,
+         ) %>%
   st_as_sf(crs = 4326) # Turn shp into sf object and project as WGS84
 
 ```
@@ -99,6 +108,23 @@ PID <-
 
 ## Exploring distributions
 
+### Population
+
+```{r plot_noV, warning = FALSE, cache = TRUE}
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = total_pop.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+            st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Total population",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+  
+```
+
 ### Income distribution
 
 ```{r IncomeDistribution warning = FALSE, cache = TRUE}
@@ -106,6 +132,8 @@ ggplot(elpaso)+
   geom_histogram(aes(med_HH_Income.2020))
 
 ```
+
+
 
 ### No vehicle distribution
 
@@ -115,7 +143,22 @@ ggplot(elpaso)+
 
 ```
 
-## Map
+```{r plot_noV, warning = FALSE, cache = TRUE}
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = pctNV.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+            st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Percentage of those claim no vehicle households by tract (%)",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+  
+```
+
+### Race
 
 ```{r plot_whitealone, warning = FALSE, cache = TRUE}
 ggplot()+
@@ -147,16 +190,51 @@ ggplot()+
   
 ```
 
-```{r plot_noV, warning = FALSE, cache = TRUE}
+### Age
+
+```{r plot_under18, warning = FALSE, cache = TRUE}
 ggplot()+
-  geom_sf(data = elpaso, aes(fill = pctNV.2020),
+  geom_sf(data = elpaso, aes(fill = pctUnder18.2020),
           color = "transparent")+
   geom_sf(data = elpaso %>%
             st_union(),
           color = "white",
           fill = "transparent")+
   labs(
-    title = "Percentage of those identifying as 'Median HH Income' by tract",
+    title = "Percentage of those under 18 years old by tract",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+  
+```
+### Ability/disability
+
+```{r plot_disability, warning = FALSE, cache = TRUE}
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = pctDisAb.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+            st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Percentage of those claim disability by tract",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+  
+```
+
+### House value
+
+```{r plot_HouseValue, warning = FALSE, cache = TRUE}
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = Value),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+            st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "House value by tract",
     subtitle = "",
     caption = "Data: US Census Bureau, ACS 5-year estimates")
   

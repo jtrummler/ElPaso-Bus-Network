@@ -2,4 +2,10 @@
 .Rhistory
 .RData
 .Ruserdata
+<<<<<<< HEAD
 ~/.boxr-oauth
+=======
+.Rdata
+.httr-oauth
+.DS_Store
+>>>>>>> 883939115811ba0b26ce0e0172522a33dac57c23
