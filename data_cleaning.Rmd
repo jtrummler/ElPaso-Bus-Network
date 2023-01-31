@@ -5,12 +5,15 @@ library(tidycensus)
 library(tigris)
 library(lubridate)
 library(here)
+<<<<<<< HEAD
 options(scipen=999)
+=======
+>>>>>>> d739e5aa8ef22c9589df8eae555a22074fc478b7
 ```
 
 ```{r}
-janaug <- read_csv("C:/Users/jtrum/Desktop/MUSA8010/data/total_boardings_2021.csv")
-sepdec <- read_csv("C:/Users/jtrum/Desktop/MUSA8010/data/total_boardings_sept.csv")
+janaug <- read_csv("C:/Users/cchue/Documents/Penn MUSA/Spring/Practicum/Data/totalboardings2021.xlsx")
+
 ridership <- rbind(janaug, sepdec)
 ```
 
