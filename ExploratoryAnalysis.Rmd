@@ -1,0 +1,241 @@
+---
+title: "ExploratoryAnalysis"
+author: "Yingxue Ou"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load data
+
+## ACS Census
+
+```{r}
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(tigris)
+
+census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
+
+```
+
+```{r}
+censusvars <- c("B01001_001E", # ACS total Pop estimate
+              "B25002_001E", # Estimate of total housing units
+              "B25002_003E", # Number of vacant housing units
+              "B19013_001E", # Median HH Income ($)
+              "B02001_002E", # People describing themselves as "white alone"
+              "B06009_006E",
+              "B01001I_001E", # Hispanic or Latino 
+              "B08014_001E",
+              "B09001_002E", # Population under 18
+              "B10052_002E", # Disability
+              "B25075_001E", # House value
+              "B08014_002E") # No vehicle available
+
+
+elpaso <- get_acs(geography = "tract",
+                             year = 2020, 
+                             variables = censusvars, 
+                             geometry = T,
+                             state = "TX", 
+                             county = "El Paso", 
+                             output = "wide") 
+
+```
+
+```{r rename column}
+elpaso <- elpaso %>%
+  rename(
+    total_pop.2020 = B01001_001E,
+    total_HU.2020 = B25002_001E,
+    total_vacant.2020 = B25002_003E,
+    med_HH_Income.2020 = B19013_001E,
+    total_White.2020 = B02001_002E,
+    total_GradDeg.2020 = B06009_006E,
+    total_HL.2020 = B01001I_001E,
+    noV.2020 = B08014_002E,
+    under18.2020 = B09001_002E,
+    disAb.2020 = B10052_002E,
+    Value = B25075_001E
+  ) %>%
+    mutate(vacancyPct.2020 = total_vacant.2020/total_HU.2020,
+         pctWhite.2020 = total_White.2020/total_pop.2020,
+         pctHL.2020 = total_HL.2020/total_pop.2020,
+         pctNV.2020 = noV.2020/total_HU.2020*100,
+         pctUnder18.2020 = under18.2020/total_pop.2020,
+         pctDisAb.2020 = disAb.2020/total_pop.2020,
+         ) %>%
+  st_as_sf(crs = 4326) # Turn shp into sf object and project as WGS84
+
+```
+
+## Open Street Map Data
+
+```{r}
+ParkandRecreation <- 
+  st_read("./OpenStreetMap/ParkandRecreationFacilities/ParkandRecreationFacilities.shp") %>%
+  st_transform('ESRI:102286')
+
+Schools <-
+  st_read("./OpenStreetMap/Schools/Schools.shp") %>%
+  st_transform('ESRI:102286')
+
+Centerline <- 
+  st_read("./OpenStreetMap/EPCenterline/EPCenterline.shp") %>%
+  st_transform('ESRI:102286')
+
+BikeLanes <-
+  st_read("./OpenStreetMap/BikeLanes/BikeLanesFinal.shp") %>%
+  st_transform('ESRI:102286')
+
+TIRZ <-
+  st_read("./OpenStreetMap/TIRZ/TIRZ.shp") %>%
+  st_transform('ESRI:102286')
+
+PID <-
+  st_read("./OpenStreetMap/PublicImprovementDistrict/PID.shp") %>%
+  st_transform('ESRI:102286')
+
+
+```
+
+# Exploratory analysis
+
+## Exploring distributions
+
+### Population
+
+```{r plot_noV, warning = FALSE, cache = TRUE}
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = total_pop.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+            st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Total population",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+  
+```
+
+### Income distribution
+
+```{r IncomeDistribution warning = FALSE, cache = TRUE}
+ggplot(elpaso)+
+  geom_histogram(aes(med_HH_Income.2020))
+
+```
+
+
+
+### No vehicle distribution
+
+```{r NovehicleDistribution warning = FALSE, cache = TRUE}
+ggplot(elpaso)+
+  geom_histogram(aes(pctNV.2020))
+
+```
+
+```{r plot_noV, warning = FALSE, cache = TRUE}
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = pctNV.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+            st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Percentage of those claim no vehicle households by tract (%)",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+  
+```
+
+### Race
+
+```{r plot_whitealone, warning = FALSE, cache = TRUE}
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = pctWhite.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+            st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Percentage of those identifying as 'white only' by tract",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+  
+```
+
+```{r plot_HL, warning = FALSE, cache = TRUE}
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = pctHL.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+            st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Percentage of those identifying as 'Hispanic or Latino' by tract",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+  
+```
+
+### Age
+
+```{r plot_under18, warning = FALSE, cache = TRUE}
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = pctUnder18.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+            st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Percentage of those under 18 years old by tract",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+  
+```
+### Ability/disability
+
+```{r plot_disability, warning = FALSE, cache = TRUE}
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = pctDisAb.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+            st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Percentage of those claim disability by tract",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+  
+```
+
+### House value
+
+```{r plot_HouseValue, warning = FALSE, cache = TRUE}
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = Value),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+            st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "House value by tract",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+  
+```

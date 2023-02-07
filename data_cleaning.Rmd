@@ -9,6 +9,9 @@ options(scipen=999)
 ```
 
 ```{r}
+
+data_folder <- file.path(here() %>% dirname(), 'data')
+
 jan <- read_excel(paste(data_folder, "/totalboardings2021.xlsx", sep = ""),
                                   sheet = "Jan-Aug")
 
@@ -33,6 +36,11 @@ ridership$Date <- ridership$Date %>%
 
 ```{r}
 stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
+
+ggplot()+
+  geom_sf(data = stops)
+
+
 ```
 
 ```{r}
@@ -43,8 +51,45 @@ rider_stops <- left_join(ridership, stops, by = c('TP' = 'stop_name'))
 
 na_riderstops <- rider_stops[is.na(rider_stops$stop_lat),]
 na_route <- unique(na_riderstops$TP) 
-print(na_route)
+#print(na_route)
 ```
+
+```{r}
+rider_stops_sf <- rider_stops %>% filter(!is.na(stop_lon)) %>%  st_as_sf(coords = c('stop_lon','stop_lat'))
+
+ggplot(rider_stops_sf)+
+  geom_sf()
+
+stops_sf <- stops %>% st_as_sf(coords = c('stop_lon','stop_lat'))
+
+ggplot(stops_sf)+
+  geom_sf(aes(color = wheelchair_boarding))
+```
+
+
+```{r stops without ridership data}
+
+uniq_riderstops <- ridership$TP %>% unique()
+
+stops_sf$ridershipdata <- ifelse(stops_sf$stop_name %in% uniq_riderstops,'y','n')
+
+ggplot(stops_sf)+
+  geom_sf(aes(color = ridershipdata, size = ifelse(ridershipdata == 'n', 3,1)))
+
+```
+```{r route ridership}
+
+route_ridership <- ridership %>% group_by(RT) %>% summarise(total_on = sum(Ons)) 
+
+ggplot(route_ridership)+
+  geom_bar(aes(x = RT), stat = 'identity')
+
+
+no_ridership <- stops_sf %>% filter(ridershipdata == 'n')
+
+S```
+
+
 
 ```{r open data and stops}
 opendata_stops <- read_csv("C:/Users/jtrum/Desktop/MUSA8010/data/BusStops.csv")
