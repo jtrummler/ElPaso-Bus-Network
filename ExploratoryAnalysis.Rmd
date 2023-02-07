@@ -240,3 +240,53 @@ ggplot()+
     caption = "Data: US Census Bureau, ACS 5-year estimates")
   
 ```
+
+## Replica Data
+
+```{r load_replica}
+install.packages('geojsonio')
+library(geojsonio)
+destination <- geojson_read("../data/replica-city_of_el_paso-02_03_23-destination_layer.geojson",  what = "sp")
+origin <- geojson_read("../data/replica-city_of_el_paso-02_03_23-origin_layer.geojson",  what = "sp")
+```
+
+```{r}
+
+# 'fortify' the data to get a dataframe format required by ggplot2
+library(broom)
+destination_fortified <- tidy(destination)
+origin_fortified <- tidy(origin)
+
+
+# Plot it
+library(ggplot2)
+ggplot() +
+  geom_polygon(data = destination_fortified, aes( x = long, y = lat, group = group), fill="#69b3a2", color="white") +
+  theme_void() +
+  labs(
+    title = "Destination layer",
+    subtitle = "",
+    caption = "Data: Replica city of El Paso")+
+  coord_map()
+
+ggplot(data = destination_fortified, aes( x = long, y = lat, group = group) ) +
+  geom_hex(bins = 70) +
+  scale_fill_continuous(type = "viridis") +
+  theme_bw()
+
+ggplot() +
+  geom_polygon(data = origin_fortified, aes( x = long, y = lat, group = group), fill="#69b3a2", color="white") +
+  theme_void() +
+  labs(
+    title = "Origin layer",
+    subtitle = "",
+    caption = "Data: Replica city of El Paso")+
+  coord_map()
+
+ggplot(data = origin_fortified, aes( x = long, y = lat, group = group) )+
+  geom_hex(bins = 70) +
+  scale_fill_continuous(type = "viridis") +
+  theme_bw()
+
+```
+
