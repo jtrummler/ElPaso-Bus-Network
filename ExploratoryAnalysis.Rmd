@@ -249,6 +249,20 @@ destination <- geojson_read("../data/replica-city_of_el_paso-02_03_23-destinatio
 origin <- geojson_read("../data/replica-city_of_el_paso-02_03_23-origin_layer.geojson",  what = "sp")
 ```
 
+
+```{r load_replica sf and here}
+destination <- read_sf(paste(data_folder, "/trip_destinations.geojson", sep = ''))
+
+origin <- read_sf(paste(data_folder, "/trip_origins.geojson", sep = ''))
+```
+
+```{r}
+ggplot(origin)+
+  geom_sf()
+```
+
+
+
 ```{r}
 
 # 'fortify' the data to get a dataframe format required by ggplot2
@@ -296,8 +310,8 @@ lab_data <- data.frame(x=c(x_cent, x_cent-len_bar, x_cent, x_cent+len_bar, x_cen
 ```{r basemape_creating}
 ggtract<-fortify(elpaso, region = "geometry") 
 
-basemap <- ggplot()+
-  geom_polygon(data = elpaso, aes( x = long, y = lat, group = group), fill="#69b3a2", color="white") +
+ggplot()+
+  geom_sf(data = elpaso, fill="#69b3a2", color="white")+
   geom_polygon(data=arrow, fill='black', aes(x=aX, y=aY)) +
   geom_polygon(data=scale_bxs[[1]], fill='grey', color='black', aes(x=x, y = y)) + 
   geom_polygon(data=scale_bxs[[2]], fill='white', color='black', aes(x=x, y = y)) + 
@@ -306,8 +320,7 @@ basemap <- ggplot()+
   labs(
     title = "Origin layer",
     subtitle = "",
-    caption = "Data: Replica city of El Paso")+
-  coord_map()
+    caption = "Data: Replica city of El Paso")
 
 basemap
 ```

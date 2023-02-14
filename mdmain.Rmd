@@ -284,7 +284,33 @@ ggplot()+
     caption = "Data: US Census Bureau, ACS 5-year estimates")
   
 ```
+## replica data
 
+```{r}
+destination <- read_sf(paste(data_folder, "/trip_destinations.geojson", sep = ''))
+
+origin <- read_sf(paste(data_folder, "/trip_origins.geojson", sep = ''))
+```
+
+
+```{r}
+elpaso_outline <- elpaso %>% st_union() %>% sf::st_cast()
+
+hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F)  %>%  st_sf() %>%
+  mutate(uniqueID = rownames(.))
+
+hex <- hex[elpaso,]
+
+ggplot(hex)+
+  geom_sf()
+```
+
+
+# outline of system
+## BRIO Lines
+## Local Busses - What we get to effect!
+
+## Model of where ridership exists 
 
 
 
