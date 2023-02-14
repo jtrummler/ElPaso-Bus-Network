@@ -303,7 +303,7 @@ origin_filtered <- subset(origin_df, FIPS_tract %in% elpaso$GEOID)
 
 ```
 
-```{r}
+```{r basemap_create}
 elpaso_outline <- elpaso %>% st_union() %>% sf::st_cast()
 
 hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F)  %>%  st_sf() %>%
@@ -315,8 +315,19 @@ basemap <- ggplot(hex)+
   geom_sf()
 ```
 
+
 ```{r}
-library(ggplot2)
+
+
+hex <- hex
+  dplyr::select(origin_fortified) %>% 
+  mutate(trip = 1) %>% 
+  aggregate(., hex, sum) %>%
+  mutate(trip = replace_na(trip, 0),
+         uniqueID = 1:n(),
+         cvID = sample(round(nrow(hex) / 24), 
+                       size=nrow(hex), replace = TRUE))
+
 
 basemap +
   geom_hex(data = destination_filtered, color='white', alpha=0.85, size=0.1, aes( x = centroidLon, y = centroidLat, fill = tripsByDestination), bins = 70) +
@@ -346,10 +357,8 @@ mapTheme <- theme(plot.title =element_text(size=12),
                   plot.margin = margin(1, 1, 1, 1, 'cm'),
                   legend.key.height = unit(1, "cm"), legend.key.width = unit(0.2, "cm"))
 
-ggplot()+
-  geom_sf(data = elpaso %>%
-          st_transform(crs=4326), color = "grey", fill = "transparent")+
-  geom_point(data = origin_filtered, aes(x=centroidLon, y = centroidLat, color = tripsByOrigin), fill = "transparent", alpha = 0.4, size = 2)+
+basemap+
+  geom_point(data = origin_fortify, aes(x=centroidLon, y = centroidLat, color = tripsByOrigin), fill = "transparent", alpha = 0.4, size = 2)+
   labs(title="Trips by Origin in El Paso County")+
   mapTheme
 
