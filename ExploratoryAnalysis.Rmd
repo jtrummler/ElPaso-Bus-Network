@@ -244,7 +244,6 @@ ggplot()+
 ## Replica Data
 
 ```{r load_replica}
-install.packages('geojsonio')
 library(geojsonio)
 destination <- geojson_read("../data/replica-city_of_el_paso-02_03_23-destination_layer.geojson",  what = "sp")
 origin <- geojson_read("../data/replica-city_of_el_paso-02_03_23-origin_layer.geojson",  what = "sp")
@@ -254,28 +253,55 @@ origin <- geojson_read("../data/replica-city_of_el_paso-02_03_23-origin_layer.ge
 
 # 'fortify' the data to get a dataframe format required by ggplot2
 library(broom)
+destination_df <- as.data.frame(destination)
+destination_filtered <- subset(destination_df, FIPS_tract %in% elpaso$GEOID)
+
+origin_df <- as.data.frame(origin)
+origin_filtered <- subset(origin_df, FIPS_tract %in% elpaso$GEOID)
+
 destination_fortified <- tidy(destination)
 origin_fortified <- tidy(origin)
+```
 
+```{r basemap_setting}
+#creating north arrow and scale bar, motivation from GISTools package
+arrow_data <- function(xb, yb, len) {
+  s <- len
+  arrow.x = c(0,0.5,1,0.5,0) - 0.5
+  arrow.y = c(0,1.7  ,0,0.5,0)
+  adata <- data.frame(aX = xb + arrow.x * s, aY = yb + arrow.y * s)
+  return(adata)
+}
 
-# Plot it
-library(ggplot2)
-ggplot() +
-  geom_polygon(data = destination_fortified, aes( x = long, y = lat, group = group), fill="#69b3a2", color="white") +
-  theme_void() +
-  labs(
-    title = "Destination layer",
-    subtitle = "",
-    caption = "Data: Replica city of El Paso")+
-  coord_map()
+scale_data <- function(llx,lly,len,height){
+  box1 <- data.frame(x = c(llx,llx+len,llx+len,llx,llx),
+                     y = c(lly,lly,lly+height,lly+height,lly))
+  box2 <- data.frame(x = c(llx-len,llx,llx,llx-len,llx-len),
+                     y = c(lly,lly,lly+height,lly+height,lly))
+  return(list(box1,box2))
+}
 
-ggplot(data = destination_fortified, aes( x = long, y = lat, group = group) ) +
-  geom_hex(bins = 70) +
-  scale_fill_continuous(type = "viridis") +
-  theme_bw()
+x_cent <- 830000
+len_bar <- 3000
+offset_scaleNum <- 64300
+arrow <- arrow_data(xb=x_cent,yb=67300,len=2500)
+scale_bxs <- scale_data(llx=x_cent,lly=65000,len=len_bar,height=750)
 
-ggplot() +
-  geom_polygon(data = origin_fortified, aes( x = long, y = lat, group = group), fill="#69b3a2", color="white") +
+lab_data <- data.frame(x=c(x_cent, x_cent-len_bar, x_cent, x_cent+len_bar, x_cent),
+                       y=c( 72300, offset_scaleNum, offset_scaleNum, offset_scaleNum, 66500),
+                       lab=c("N","0","3","6","Kilometers"))
+
+```
+
+```{r basemape_creating}
+ggtract<-fortify(elpaso, region = "geometry") 
+
+basemap <- ggplot()+
+  geom_polygon(data = elpaso, aes( x = long, y = lat, group = group), fill="#69b3a2", color="white") +
+  geom_polygon(data=arrow, fill='black', aes(x=aX, y=aY)) +
+  geom_polygon(data=scale_bxs[[1]], fill='grey', color='black', aes(x=x, y = y)) + 
+  geom_polygon(data=scale_bxs[[2]], fill='white', color='black', aes(x=x, y = y)) + 
+  geom_text(data=lab_data, size=4, aes(x=x,y=y,label=lab)) +
   theme_void() +
   labs(
     title = "Origin layer",
@@ -283,10 +309,135 @@ ggplot() +
     caption = "Data: Replica city of El Paso")+
   coord_map()
 
+basemap
+```
+
+
+```{r}
+library(ggplot2)
+
+ggplot() +
+  geom_hex(data = destination_filtered, color='white', alpha=0.85, size=0.1, aes( x = centroidLon, y = centroidLat, fill = tripsByDestination), bins = 70) +
+  scale_fill_continuous(type = "viridis") +
+  scale_fill_brewer(name="Destination trips count", palette="OrRd")
+  theme_bw()
+```
+
+```{r}
+
 ggplot(data = origin_fortified, aes( x = long, y = lat, group = group) )+
   geom_hex(bins = 70) +
   scale_fill_continuous(type = "viridis") +
+    labs(
+    title = "Origin",
+    subtitle = "",
+    caption = "Data: Replica City of El Paso")+
   theme_bw()
 
+ggplot(data = destination_fortified, aes( x = long, y = lat, group = group) )+
+  geom_hex(bins = 70) +
+  scale_fill_continuous(type = "viridis") +
+    labs(
+    title = "Destination",
+    subtitle = "",
+    caption = "Data: Replica City of El Paso")+
+  theme_bw()
+
+
+
+```
+
+
+```{r}
+
+mapTheme <- theme(plot.title =element_text(size=12),
+                  plot.subtitle = element_text(size=8),
+                  plot.caption = element_text(size = 6),
+                  axis.line=element_blank(),
+                  axis.text.x=element_blank(),
+                  axis.text.y=element_blank(),
+                  axis.ticks=element_blank(),
+                  axis.title.x=element_blank(),
+                  axis.title.y=element_blank(),
+                  panel.background=element_blank(),
+                  panel.border=element_blank(),
+                  panel.grid.major=element_line(colour = 'transparent'),
+                  panel.grid.minor=element_blank(),
+                  legend.direction = "vertical", 
+                  legend.position = "right",
+                  plot.margin = margin(1, 1, 1, 1, 'cm'),
+                  legend.key.height = unit(1, "cm"), legend.key.width = unit(0.2, "cm"))
+
+ggplot()+
+  geom_sf(data = elpaso %>%
+          st_transform(crs=4326), color = "grey", fill = "transparent")+
+  geom_point(data = origin_filtered, aes(x=centroidLon, y = centroidLat, color = tripsByOrigin), fill = "transparent", alpha = 0.4, size = 2)+
+  labs(title="Trips by Origin in El Paso County")+
+  mapTheme
+
+ggplot()+
+  geom_sf(data = elpaso %>%
+          st_transform(crs=4326), color = "grey", fill = "transparent")+
+  geom_point(data = destination_filtered, aes(x=centroidLon, y = centroidLat, color = tripsByDestination), fill = "transparent", alpha = 0.4, size = 2)+
+  labs(title="Trips by Destinatin in El Paso County")+
+  mapTheme
+
+
+```
+
+
+```{r}
+elpaso$tripsByDestination  <- destination_filtered$tripsByDestination[match(elpaso$GEOID, destination_filtered$FIPS_tract)]
+elpaso$tripsByDestination_sqmi <- destination_filtered$tripsByDestination_sqmi[match(elpaso$GEOID, destination_filtered$FIPS_tract)]
+elpaso$tripsByOrigin <- origin_filtered$tripsByOrigin[match(elpaso$GEOID, origin_filtered$FIPS_tract)]
+elpaso$tripsByOrigin_sqmi <- origin_filtered$tripsByOrigin_sqmi[match(elpaso$GEOID, origin_filtered$FIPS_tract)]
+
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = tripsByOrigin),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Trips by Origin",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = tripsByDestination),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Trips by Destination",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = tripsByOrigin_sqmi),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Trips by Origin",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = tripsByDestination_sqmi),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Trips by Destination",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
 ```
 

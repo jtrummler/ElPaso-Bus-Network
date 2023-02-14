@@ -16,8 +16,8 @@ The use case for our app and forecast is for SunMetro planners. We imagine that 
 
 ## Tasks
 
-(1) Familiarizing ourselves with El Paso (demographics, economy, culture, etc.) and the SunMetro system (current state of transit, different bus services, etc.)
+Charlie: Replica data, hexgrid
 
-(2) Exploring data including 2022 ridership data and American Community Survery data
+Jack: Open Street Map, presentation
 
-(3) Wireframing basic ideas for application development
+Yingxue: Replica data
