@@ -1,5 +1,5 @@
 ---
-title: "Forecasting Bus Transit Alternatives in El Paso, Texas"
+title: "Forecasting and Predicting Bus Transit Alternatives in El Paso, Texas"
 author: "Charlie Huemmler, Yingxue Ou, Jack Rummler"
 date: "2023-02-18"
 output:
@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = TRUE,
   warning=FALSE,
   message=FALSE,
   results='hide')
-
+install.packages("ggplotify")
 library(sf)
 library(tidyverse)
 library(tidycensus)
@@ -27,11 +27,49 @@ library(lubridate)
 library(here)
 library(readxl)
 library(gridExtra)
+library(scales)
+library(viridis)
+library(leaflet)
+library(ggplotify)
+library(ggmap)
 
 census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
 data_folder <- file.path(
   here() %>% 
     dirname(), 'data')
+
+plotTheme <- theme(
+  plot.title =element_text(size=12),
+  plot.subtitle = element_text(size=8),
+  plot.caption = element_text(size = 6),
+  axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
+  axis.text.y = element_text(size = 10),
+  axis.title.y = element_text(size = 10),
+  # Set the entire chart region to blank
+  panel.background=element_blank(),
+  plot.background=element_blank(),
+  #panel.border=element_rect(colour="#F0F0F0"),
+  # Format the grid
+  panel.grid.major=element_line(colour="#D0D0D0",size=.75),
+  axis.ticks=element_blank())
+
+mapTheme <- theme(plot.title =element_text(size=12),
+                  plot.subtitle = element_text(size=8),
+                  plot.caption = element_text(size = 6),
+                  axis.line=element_blank(),
+                  axis.text.x=element_blank(),
+                  axis.text.y=element_blank(),
+                  axis.ticks=element_blank(),
+                  axis.title.x=element_blank(),
+                  axis.title.y=element_blank(),
+                  panel.background=element_blank(),
+                  panel.border=element_blank(),
+                  panel.grid.major=element_line(colour = 'transparent'),
+                  panel.grid.minor=element_blank(),
+                  legend.direction = "vertical", 
+                  legend.position = "right",
+                  plot.margin = margin(1, 1, 1, 1, 'cm'),
+                  legend.key.height = unit(1, "cm"), legend.key.width = unit(0.2, "cm"))
 ```
 
 # Introduction and Use Case
@@ -50,5 +88,55 @@ ridership$Date <- ridership$Date %>%
 
 stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
 stops_sf <- stops %>% st_as_sf(coords = c('stop_lon','stop_lat'))
+
+df <- riderstops1 %>%
+  na.omit(riderstops1[, c("stop_lat", "stop_lon")]) %>% 
+  st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4326)
 ```
+
+
+```{r find stops without ridership data}
+dfRT <- df %>%
+  group_by(RT, stop_desc) %>%
+  summarize(avg_ons = mean(Ons), avg_offs = mean(Offs))
+```
+
+```{r}
+dfRT_nogeom <- dfRT %>%
+  select(-geometry)
+
+ggplot(dfRT_nogeom, aes(x = avg_ons, y = avg_offs)) +
+  geom_point() +
+  labs(x = "Average on-boarding", y = "Average off-boarding", title = "Scatterplot of on-boarding and off-boarding", subtitle="Average values grouped by route and stop information")+
+  geom_smooth(method = lm, se=FALSE, colour = "green", size=1, )+
+  plotTheme
+```
+
+```{r}
+dfRT1 <- subset(dfRT, avg_ons > 10)
+dfRT2 <- subset(dfRT, avg_ons < 10)
+dfRT3 <- subset(dfRT, avg_offs > 10)
+dfRT4 <- subset(dfRT, avg_offs < 10)
+
+a <- ggplot()+
+  geom_sf(data=dfRT1, aes(color=avg_ons))+
+  scale_color_viridis(option="G")
+
+layer < base_layer(a)
+# ggplot()+
+#   geom_sf(data=dfRT2, aes(color=avg_ons))+
+#   scale_color_viridis(option="G")+
+#   mapTheme,
+# ggplot()+
+#   geom_sf(data=dfRT3, aes(color=avg_offs))+
+#   scale_color_viridis(option="G")+
+#   mapTheme,
+# ggplot()+
+#   geom_sf(data=dfRT4, aes(color=avg_offs))+
+#   scale_color_viridis(option="G")+
+#   mapTheme
+# )
+```
+
+
 
