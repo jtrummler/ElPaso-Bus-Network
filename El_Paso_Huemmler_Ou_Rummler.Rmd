@@ -1,0 +1,54 @@
+---
+title: "Forecasting Bus Transit Alternatives in El Paso, Texas"
+author: "Charlie Huemmler, Yingxue Ou, Jack Rummler"
+date: "2023-02-18"
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+    code_folding: hide
+    pdf_document: default
+    theme: journal
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+  warning=FALSE,
+  message=FALSE,
+  results='hide')
+
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(tigris)
+library(boxr)
+library(lubridate)
+library(here)
+library(readxl)
+library(gridExtra)
+
+census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
+data_folder <- file.path(
+  here() %>% 
+    dirname(), 'data')
+```
+
+# Introduction and Use Case
+
+XXX
+
+# Data Gathering & Analysis
+
+```{r cleaning ridership data}
+ridership <- read.csv(paste(data_folder, "/ridership.csv", sep = ''))
+
+ridership$Date <- ridership$Date %>% 
+  as.character() %>% 
+  substring(2) %>% 
+  as.Date(format = "%Y%m%d")
+
+stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
+stops_sf <- stops %>% st_as_sf(coords = c('stop_lon','stop_lat'))
+```
+
