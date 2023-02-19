@@ -12,12 +12,12 @@ output:
     theme: journal
 ---
 
-```{r setup, include=FALSE}
+```{r setup}
 knitr::opts_chunk$set(echo = TRUE,
   warning=FALSE,
   message=FALSE,
   results='hide')
-install.packages("ggplotify")
+
 library(sf)
 library(tidyverse)
 library(tidycensus)
@@ -32,6 +32,8 @@ library(viridis)
 library(leaflet)
 library(ggplotify)
 library(ggmap)
+library(classInt)
+library(rlang)
 
 census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
 data_folder <- file.path(
@@ -111,31 +113,55 @@ ggplot(dfRT_nogeom, aes(x = avg_ons, y = avg_offs)) +
   geom_smooth(method = lm, se=FALSE, colour = "green", size=1, )+
   plotTheme
 ```
+```{r}
+# Load the classInt package
+library(classInt)
+
+# Calculate the natural breaks (Jenks) using the classIntervals() function
+jenks <- classIntervals(dfRT$avg_ons, n = 4, style = "jenks")
+
+# Print the results
+dfRT$category <- cut(dfRT$avg_ons, breaks = jenks$brks)
+
+jenks
+```
 
 ```{r}
-dfRT1 <- subset(dfRT, avg_ons > 10)
-dfRT2 <- subset(dfRT, avg_ons < 10)
-dfRT3 <- subset(dfRT, avg_offs > 10)
-dfRT4 <- subset(dfRT, avg_offs < 10)
+ggplot() +
+  geom_sf(data=dfRT, aes(color=as.numeric(category)))+
+  scale_color_viridis(option="G", 
+                      labels=c("[0,13.35]", 
+                               "(13.35,46.71]", 
+                               "(46.71,96.93]", 
+                               "(96.93,211.2814]"))+
+  labs(title="Average ons per ")+
+  mapTheme
+```
 
-a <- ggplot()+
+```{r}
+dfRT1 <- dfRT[dfRT$avg_ons == 0, ]
+dfRT2 <- dfRT[dfRT$avg_ons < 5, ]
+dfRT3 <- dfRT[dfRT$avg_ons > 5 & dfRT$avg_ons < 10, ]
+dfRT4 <- dfRT[dfRT$avg_ons > 10, ]
+
+grid.arrange(ncol=2,
+ggplot()+
   geom_sf(data=dfRT1, aes(color=avg_ons))+
-  scale_color_viridis(option="G")
-
-layer < base_layer(a)
-# ggplot()+
-#   geom_sf(data=dfRT2, aes(color=avg_ons))+
-#   scale_color_viridis(option="G")+
-#   mapTheme,
-# ggplot()+
-#   geom_sf(data=dfRT3, aes(color=avg_offs))+
-#   scale_color_viridis(option="G")+
-#   mapTheme,
-# ggplot()+
-#   geom_sf(data=dfRT4, aes(color=avg_offs))+
-#   scale_color_viridis(option="G")+
-#   mapTheme
-# )
+  scale_color_viridis(option="G")+
+  mapTheme,
+ggplot()+
+  geom_sf(data=dfRT2, aes(color=avg_ons))+
+  scale_color_viridis(option="G")+
+  mapTheme,
+ggplot()+
+  geom_sf(data=dfRT3, aes(color=avg_offs))+
+  scale_color_viridis(option="G")+
+  mapTheme,
+ggplot()+
+  geom_sf(data=dfRT4, aes(color=avg_offs))+
+  scale_color_viridis(option="G")+
+  mapTheme
+)
 ```
 
 
