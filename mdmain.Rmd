@@ -289,8 +289,18 @@ destination <- read_sf(paste(data_folder, "/trip_destinations.geojson", sep = ''
 origin <- read_sf(paste(data_folder, "/trip_origins.geojson", sep = ''))
 ```
 
+```{r fortify}
+# 'fortify' the data to get a dataframe format required by ggplot2
+library(broom)
+destination_df <- as.data.frame(destination)
+destination_filtered <- subset(destination_df, FIPS_tract %in% elpaso$GEOID)
 
-```{r}
+origin_df <- as.data.frame(origin)
+origin_filtered <- subset(origin_df, FIPS_tract %in% elpaso$GEOID)
+
+```
+
+```{r basemap_create}
 elpaso_outline <- elpaso %>% st_union() %>% sf::st_cast()
 
 hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F)  %>%  st_sf() 
@@ -298,7 +308,7 @@ hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F)  %>
 hex <- hex[elpaso,] %>%
   mutate(uniqueID = rownames(.))
 
-ggplot(hex)+
+basemap <- ggplot(hex)+
   geom_sf()
 ```
 ```{r}
@@ -311,6 +321,118 @@ ridership_net <-
          cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
 ```
 
+
+```{r}
+
+
+hex <- hex
+  dplyr::select(origin_fortified) %>% 
+  mutate(trip = 1) %>% 
+  aggregate(., hex, sum) %>%
+  mutate(trip = replace_na(trip, 0),
+         uniqueID = 1:n(),
+         cvID = sample(round(nrow(hex) / 24), 
+                       size=nrow(hex), replace = TRUE))
+
+
+basemap +
+  geom_hex(data = destination_filtered, color='white', alpha=0.85, size=0.1, aes( x = centroidLon, y = centroidLat, fill = tripsByDestination), bins = 70) +
+  scale_fill_continuous(type = "viridis") +
+  scale_fill_brewer(name="Destination trips count", palette="OrRd")
+  theme_bw()
+```
+
+
+```{r}
+
+mapTheme <- theme(plot.title =element_text(size=12),
+                  plot.subtitle = element_text(size=8),
+                  plot.caption = element_text(size = 6),
+                  axis.line=element_blank(),
+                  axis.text.x=element_blank(),
+                  axis.text.y=element_blank(),
+                  axis.ticks=element_blank(),
+                  axis.title.x=element_blank(),
+                  axis.title.y=element_blank(),
+                  panel.background=element_blank(),
+                  panel.border=element_blank(),
+                  panel.grid.major=element_line(colour = 'transparent'),
+                  panel.grid.minor=element_blank(),
+                  legend.direction = "vertical", 
+                  legend.position = "right",
+                  plot.margin = margin(1, 1, 1, 1, 'cm'),
+                  legend.key.height = unit(1, "cm"), legend.key.width = unit(0.2, "cm"))
+
+basemap+
+  geom_point(data = origin_fortify, aes(x=centroidLon, y = centroidLat, color = tripsByOrigin), fill = "transparent", alpha = 0.4, size = 2)+
+  labs(title="Trips by Origin in El Paso County")+
+  mapTheme
+
+ggplot()+
+  geom_sf(data = elpaso %>%
+          st_transform(crs=4326), color = "grey", fill = "transparent")+
+  geom_point(data = destination_filtered, aes(x=centroidLon, y = centroidLat, color = tripsByDestination), fill = "transparent", alpha = 0.4, size = 2)+
+  labs(title="Trips by Destinatin in El Paso County")+
+  mapTheme
+
+
+```
+
+
+```{r}
+elpaso$tripsByDestination  <- destination_filtered$tripsByDestination[match(elpaso$GEOID, destination_filtered$FIPS_tract)]
+elpaso$tripsByDestination_sqmi <- destination_filtered$tripsByDestination_sqmi[match(elpaso$GEOID, destination_filtered$FIPS_tract)]
+elpaso$tripsByOrigin <- origin_filtered$tripsByOrigin[match(elpaso$GEOID, origin_filtered$FIPS_tract)]
+elpaso$tripsByOrigin_sqmi <- origin_filtered$tripsByOrigin_sqmi[match(elpaso$GEOID, origin_filtered$FIPS_tract)]
+
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = tripsByOrigin),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Trips by Origin",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = tripsByDestination),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Trips by Destination",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = tripsByOrigin_sqmi),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Trips by Origin",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = tripsByDestination_sqmi),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+  labs(
+    title = "Trips by Destination",
+    subtitle = "",
+    caption = "Data: US Census Bureau, ACS 5-year estimates")
+```
 
 # outline of system
 ## BRIO Lines

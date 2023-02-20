@@ -245,8 +245,8 @@ ggplot()+
 
 ```{r load_replica}
 library(geojsonio)
-destination <- geojson_read("../data/replica-city_of_el_paso-02_03_23-destination_layer.geojson",  what = "sp")
-origin <- geojson_read("../data/replica-city_of_el_paso-02_03_23-origin_layer.geojson",  what = "sp")
+destination <- geojson_read("../data/trip_destinations.geojson",  what = "sp")
+origin <- geojson_read("../data/trip_origins.geojson",  what = "sp")
 ```
 
 

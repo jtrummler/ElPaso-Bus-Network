@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>El Paso Bus System</title>
+
+    <!-- My CSS files-->
+    <link href="css/styles.css" rel="stylesheet" type="text/css"/>
+    
+    <!-- Using hosted version of Leaflet-->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+    integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI="
+    crossorigin=""/>
+
+    <!-- Make sure you put this AFTER Leaflet's CSS -->
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+    integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM="
+    crossorigin=""></script>
+  
+    <!-- My project JS modules-->
+    <script type="module" src="js/main.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.js"></script>
+
+  </head>
+
+
+  <body>
+    <div class="sidebar">
+
+        <div>
+            <h1 class="h1">El Paso Bus System</h1>
+        </div>
+
+        <ul class="list-container">
+            <h2>Current data visulization</h2>
+            <input type="checkbox" id="myCheck" onclick="checkbox()">
+            <label for="myCheck" class="label">Current ridership</label> 
+            <input type="range" min="1" max="100" value="50" class="slider" id="ridership">
+            
+            <input type="checkbox" id="myCheck" onclick="checkbox()">
+            <label for="myCheck" class="label">Density of bus stops/routes</label> 
+            <input type="range" min="1" max="100" value="50" class="slider" id="density">
+
+            <input type="checkbox" id="myCheck" onclick="checkbox()">
+            <label for="myCheck" class="label">Replica data of origin and destination</label> 
+            <input type="range" min="1" max="100" value="50" class="slider" id="replica">
+
+        </ul>
+
+        <ul class="graph-container">
+            <h2>Graph</h2>
+            <canvas id="pieChart" style="width:100%;max-width:600px"></canvas>
+            <script>
+                var xValues = ["White", "Hispanic", "Black", "Others"];
+                var yValues = [55, 50, 44, 24];
+                var barColors = [
+                "#b91d47",
+                "#00aba9",
+                "#2b5797",
+                "#e8c3b9"
+                ];
+
+                new Chart("pieChart", {
+                type: "doughnut",
+                data: {
+                    labels: xValues,
+                    datasets: [{
+                    backgroundColor: barColors,
+                    data: yValues
+                    }]
+                },
+                options: {
+                    title: {
+                    display: true,
+                    text: "Races"
+                    }
+                }
+                });
+            </script>
+
+            <canvas id="lineChart" style="width:100%;max-width:600px"></canvas>
+            <script>
+                var xValues = [50,60,70,80,90,100,110,120,130,140,150];
+                var yValues = [7,8,8,9,9,9,10,11,14,14,15];
+
+                new Chart("lineChart", {
+                type: "line",
+                data: {
+                    labels: xValues,
+                    datasets: [{
+                    fill: false,
+                    lineTension: 0,
+                    backgroundColor: "#ececec",
+                    borderColor: "#ececec",
+                    data: yValues
+                    }]
+                },
+                options: {
+                    legend: {display: false},
+                    scales: {
+                    yAxes: [{ticks: {min: 6, max:16}}],
+                    },
+                    title: {
+                    display: true,
+                    text: "Ridership"
+                    }
+                }
+                });
+            </script>
+
+
+        </ul>
+    </div>
+    <div id="map" ></div>
+
+  </body>
+
+</html>
+
+
+
+
+  
