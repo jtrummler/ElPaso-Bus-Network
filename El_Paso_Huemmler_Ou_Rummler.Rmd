@@ -12,7 +12,7 @@ output:
     theme: journal
 ---
 
-```{r setup}
+```{r setup, warning=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
   warning=FALSE,
   message=FALSE,
@@ -34,6 +34,13 @@ library(ggplotify)
 library(ggmap)
 library(classInt)
 library(rlang)
+library(dplyr)
+library(maps)
+library(plotly)
+library(RColorBrewer)
+library(htmlwidgets)
+library(magick)
+library(cowplot)
 
 census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
 data_folder <- file.path(
@@ -76,9 +83,15 @@ mapTheme <- theme(plot.title =element_text(size=12),
 
 # Introduction and Use Case
 
-XXX
+Sun Metro is the transportation provider in the city of El Paso, Texas. Sun Metro has made several expansions in the past decase, particularly adding four bus rapid transit (BRT) lines, adding the streetcar network, and a new transit center. With many transit agencies in the last decade, there has been a yearly decrease in bus ridership, with a sharp decrease at the start of the COVID-19 pandemic. Now, Sun Metro experiences about 63% of pre-pandemic ridership numbers, but the agency is looking to explore the implications of new bus transit services.
+
+The four BRIO lines currently have the greatest ridership and frequency, accounting for 40% of current ridership. Local bus routes and BRIO lines account for 65% of system ridership. As BRIO stops are spaced out every 3/4 to 1 mile, the agency is seeking ways to connect local bus transit routes to BRIO lines, accommodating issues associated with the first-mile/last-mile problem. Within new bus transit alternatives, Sun Metro wants to maximize both financial profitability of routes and equity/accessibility concerns.
+
+Our client wishes to understand the ramifications of bus transit alternatives on the existing Sun Metro network based on current ridership counts and demographic/built environment indicators. We are developing a proof-of-concept, unbiased evaluation framework for Sun Metro transit planners to maximize the social equity and financial profitability outcomes of alternative bus route scenarios.
 
 # Data Gathering & Analysis
+
+Our client provided us with ridership data for the year 2022. Data was collected via sensors on a daily basis, recording number of on-boards and off-boards per stop and route. About 85% of buses were supplied with the sensors, thus the sensors had to be rotated to get the most accurate measures. We were also provided Replica data to analyze origin and destination data, aggregated at the census tract level. We gathered data from the American Community Survey and Open Data El Paso to integrate as community demographic and built environment indicators.
 
 ```{r cleaning ridership data}
 ridership <- read.csv(paste(data_folder, "/ridership.csv", sep = ''))
@@ -89,80 +102,368 @@ ridership$Date <- ridership$Date %>%
   as.Date(format = "%Y%m%d")
 
 stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
-stops_sf <- stops %>% st_as_sf(coords = c('stop_lon','stop_lat'))
+stops_sf <- stops %>% 
+  st_as_sf(coords = c('stop_lon','stop_lat')) 
+
+riderstops1 <- read.csv(paste(data_folder, "/riderstops1.csv", sep = ''))
 
 df <- riderstops1 %>%
   na.omit(riderstops1[, c("stop_lat", "stop_lon")]) %>% 
   st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4326)
+
+df$longitude <- st_coordinates(df$geometry)[, "X"]
+df$latitude <- st_coordinates(df$geometry)[, "Y"]
 ```
 
-
 ```{r find stops without ridership data}
-dfRT <- df %>%
-  group_by(RT, stop_desc) %>%
+dfRTx <- df %>%
+  group_by(RT, stop_desc, longitude, latitude) %>%
   summarize(avg_ons = mean(Ons), avg_offs = mean(Offs))
 ```
 
 ```{r}
-dfRT_nogeom <- dfRT %>%
+dfRT_nogeom <- dfRTx %>%
   select(-geometry)
 
 ggplot(dfRT_nogeom, aes(x = avg_ons, y = avg_offs)) +
   geom_point() +
-  labs(x = "Average on-boarding", y = "Average off-boarding", title = "Scatterplot of on-boarding and off-boarding", subtitle="Average values grouped by route and stop information")+
-  geom_smooth(method = lm, se=FALSE, colour = "green", size=1, )+
+  labs(x = "Average on-boarding", 
+       y = "Average off-boarding", 
+       title = "Scatterplot of on-boarding and off-boarding", 
+       subtitle="Average values grouped by route and stop information")+
+  geom_smooth(method = lm, se=FALSE, colour = "#fc8961", size=1, )+
+  geom_abline(intecept=0, slope=1, color="#fc8961", alpha=0.3, size=1, style='dashed')+
   plotTheme
 ```
+
+As the scatterplot indicates, there is a strong correlation between average on-board and off-board frequency. This indicates that in bus transit trips, the average rider may exhibit round-trip behavior, boarding the bus at point A to travel to point B and then returning to point A without any intermediate stops.
+
 ```{r}
-# Load the classInt package
-library(classInt)
+jenks_breaks <- classIntervals(dfRTx$avg_ons, n = 9, style = "jenks")$brks
 
-# Calculate the natural breaks (Jenks) using the classIntervals() function
-jenks <- classIntervals(dfRT$avg_ons, n = 4, style = "jenks")
+colors <- colorRampPalette(magma(9))
 
-# Print the results
-dfRT$category <- cut(dfRT$avg_ons, breaks = jenks$brks)
+LL1 <- leaflet(dfRTx) %>%
+  addTiles() %>%
+  setView(lng = -106.485, lat = 31.763, zoom = 12) %>%
+  addCircleMarkers(data = dfRTx, lng = ~longitude, lat = ~latitude, 
+                   radius = 5, 
+                   color = ~colors(9)[cut(avg_ons, breaks = jenks_breaks)], 
+                   fillOpacity = 0.7,
+                   popup = paste(
+                     "Route: ", dfRTx$RT, "<br>",
+                     "Stop: ", dfRTx$stop_desc, "<br>",
+                     "Average Onboarding: ", round(dfRTx$avg_ons, digits = 2))) %>%
+  addLegend("bottomright", 
+            title = "Average Onboarding per stop & route", 
+            colors = colors(9), 
+            labels = c(sprintf("%.2f - %.2f", jenks_breaks[1], jenks_breaks[2]), 
+                       sprintf("%.2f - %.2f", jenks_breaks[2], jenks_breaks[3]), 
+                       sprintf("%.2f - %.2f", jenks_breaks[3], jenks_breaks[4]), 
+                       sprintf("%.2f - %.2f", jenks_breaks[4], jenks_breaks[5]), 
+                       sprintf("%.2f - %.2f", jenks_breaks[5], jenks_breaks[6]), 
+                       sprintf("%.2f - %.2f", jenks_breaks[6], jenks_breaks[7]), 
+                       sprintf("%.2f - %.2f", jenks_breaks[7], jenks_breaks[8]), 
+                       sprintf("%.2f - %.2f", jenks_breaks[8], jenks_breaks[9]), 
+                       sprintf(">%0.2f", jenks_breaks[9])),
+            opacity = 1) 
 
-jenks
+LL1
+widgetframe::frameWidget(LL1, height = 500)
 ```
 
 ```{r}
-ggplot() +
-  geom_sf(data=dfRT, aes(color=as.numeric(category)))+
-  scale_color_viridis(option="G", 
-                      labels=c("[0,13.35]", 
-                               "(13.35,46.71]", 
-                               "(46.71,96.93]", 
-                               "(96.93,211.2814]"))+
-  labs(title="Average ons per ")+
+# colors <- colorRampPalette(magma(9))
+# 
+# avOns <- ggplot() +
+#   geom_sf(data = dfRTx, aes(color=avg_ons)) +
+#   scale_color_manual(name = "Average Onboarding per stop & route", 
+#                      values = colors, 
+#                      labels = c(sprintf("%.2f - %.2f", jenks_breaks[1], jenks_breaks[2]), 
+#                                 sprintf("%.2f - %.2f", jenks_breaks[2], jenks_breaks[3]), 
+#                                 sprintf("%.2f - %.2f", jenks_breaks[3], jenks_breaks[4]), 
+#                                 sprintf("%.2f - %.2f", jenks_breaks[4], jenks_breaks[5]), 
+#                                 sprintf("%.2f - %.2f", jenks_breaks[5], jenks_breaks[6]), 
+#                                 sprintf("%.2f - %.2f", jenks_breaks[6], jenks_breaks[7]), 
+#                                 sprintf("%.2f - %.2f", jenks_breaks[7], jenks_breaks[8]), 
+#                                 sprintf("%.2f - %.2f", jenks_breaks[8], jenks_breaks[9]), 
+#                                 sprintf(">%0.2f", jenks_breaks[9])))
+# 
+# avOns +
+#   theme(legend.position = "bottomright") +
+#   labs(title = "Average Onboarding per stop & route", 
+#        x = "Longitude", 
+#        y = "Latitude")
+# 
+# avOns
+```
+
+
+
+```{r}
+jenks_breaksOffs <- classIntervals(dfRTx$avg_offs, n = 9, style = "jenks")$brks
+
+LL2 <- leaflet(dfRTx) %>%
+  addTiles() %>%
+  setView(lng = -106.485, lat = 31.763, zoom = 12) %>%
+  addCircleMarkers(data = dfRTx, lng = ~longitude, lat = ~latitude, 
+                   radius = 5, 
+                   color = ~colors(9)[cut(avg_offs, breaks = jenks_breaksOffs)], 
+                   fillOpacity = 0.7,
+                   popup = paste(
+                     "Route: ", dfRTx$RT, "<br>",
+                     "Stop: ", dfRTx$stop_desc, "<br>",
+                     "Average Offboarding: ", round(dfRTx$avg_offs, digits = 2))) %>%
+  addLegend("bottomright", 
+            title = "Average Offboarding per stop & route", 
+            colors = colors(9), 
+            labels = c(sprintf("%.2f - %.2f", jenks_breaksOffs[1], jenks_breaksOffs[2]), 
+                       sprintf("%.2f - %.2f", jenks_breaksOffs[2], jenks_breaksOffs[3]), 
+                       sprintf("%.2f - %.2f", jenks_breaksOffs[3], jenks_breaksOffs[4]), 
+                       sprintf("%.2f - %.2f", jenks_breaksOffs[4], jenks_breaksOffs[5]), 
+                       sprintf("%.2f - %.2f", jenks_breaksOffs[5], jenks_breaksOffs[6]), 
+                       sprintf("%.2f - %.2f", jenks_breaksOffs[6], jenks_breaksOffs[7]), 
+                       sprintf("%.2f - %.2f", jenks_breaksOffs[7], jenks_breaksOffs[8]), 
+                       sprintf("%.2f - %.2f", jenks_breaksOffs[8], jenks_breaksOffs[9]), 
+                       sprintf(">%0.2f", jenks_breaksOffs[9])),
+            opacity = 1) 
+LL2
+```
+
+[LL2]("C:/Users/jtrum/pennmusa/MUSA8010/repository/ElPaso-Bus-Network/LL1.html")
+
+## Census Data
+
+```{r census data, message=FALSE, warning=FALSE}
+censusvars <- c("B01001_001E", # ACS total Pop estimate
+              "B25002_001E", # Estimate of total housing units
+              "B25002_003E", # Number of vacant housing units
+              "B19013_001E", # Median HH Income ($)
+              "B02001_002E", # People describing themselves as "white alone"
+              "B06009_006E",
+              "B01001I_001E", # Hispanic or Latino 
+              "B08014_001E",
+              "B09001_002E", # Population under 18
+              "B10052_002E", # Disability
+              "B25075_001E", # House value
+              "B08014_002E") # No vehicle available
+
+
+elpaso <- get_acs(geography = "tract",
+                             year = 2020, 
+                             variables = censusvars, 
+                             geometry = T,
+                             state = "TX", 
+                             county = "El Paso", 
+                             output = "wide") 
+
+```
+
+```{r rename column}
+elpaso <- elpaso %>%
+  rename(
+    total_pop.2020 = B01001_001E,
+    total_HU.2020 = B25002_001E,
+    total_vacant.2020 = B25002_003E,
+    med_HH_Income.2020 = B19013_001E,
+    total_White.2020 = B02001_002E,
+    total_GradDeg.2020 = B06009_006E,
+    total_HL.2020 = B01001I_001E,
+    noV.2020 = B08014_002E,
+    under18.2020 = B09001_002E,
+    disAb.2020 = B10052_002E,
+    Value = B25075_001E
+  ) %>%
+    mutate(vacancyPct.2020 = total_vacant.2020/total_HU.2020*100,
+         pctWhite.2020 = total_White.2020/total_pop.2020*100,
+         pctHL.2020 = total_HL.2020/total_pop.2020*100,
+         pctNV.2020 = noV.2020/total_HU.2020*100,
+         pctUnder18.2020 = under18.2020/total_pop.2020*100,
+         pctDisAb.2020 = disAb.2020/total_pop.2020*100,
+         ) %>%
+  st_as_sf(crs = 4326) # Turn shp into sf object and project as WGS84
+```
+
+### % White Population
+
+```{r plot_noV1, warning = FALSE, cache = TRUE}
+pctWhite <- ggplot()+
+  geom_sf(data = elpaso, aes(fill =  pctWhite.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+   scale_fill_viridis('% White',
+                      direction = -1,
+                      option = 'B',
+                      alpha = 0.8)+
+  labs(
+    title = "% of White Population",
+    subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
+  mapTheme
+
+pctWhite
+```
+
+### % Vacant Households
+
+```{r}
+pctVacant <- ggplot()+
+  geom_sf(data = elpaso, aes(fill = vacancyPct.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+   scale_fill_viridis('% Vacancy',
+                      direction = -1,
+                      option = 'B',
+                      alpha = 0.8)+
+  labs(
+    title = "% of Vacant Households",
+    subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
+  mapTheme
+
+pctVacant
+```
+
+### % No Vehicle Households
+
+```{r pct no vehicle}
+pctNoVehicle <- ggplot()+
+  geom_sf(data = elpaso, aes(fill = pctNV.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+   scale_fill_viridis('% No Vehicle Households',
+                      direction = -1,
+                      option = 'B',
+                      alpha = 0.8)+
+  labs(
+    title = "% of No Vehicle Households",
+    subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
+  mapTheme
+
+pctNoVehicle
+```
+
+### % Hispanic/Latino Population
+
+```{r}
+pctHL <- ggplot()+
+  geom_sf(data = elpaso, aes(fill = pctHL.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+   scale_fill_viridis('% Hispanic/Latino',
+                      direction = -1,
+                      option = 'B',
+                      alpha = 0.8)+
+  labs(
+    title = "% of Hispanic/Latino Population",
+    subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
+  mapTheme
+
+pctHL
+```
+
+### % residents under the age of 18
+
+```{r pct under 18}
+pctUnder18 <- ggplot()+
+  geom_sf(data = elpaso, aes(fill = pctUnder18.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+   scale_fill_viridis('% Under 18',
+                      direction = -1,
+                      option = 'B',
+                      alpha = 0.8)+
+  labs(
+    title = "% of residents under the age of 18",
+    subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
+  mapTheme
+
+pctUnder18
+```
+
+### 
+
+```{r pct disab}
+pctDisabled <- ggplot()+
+  geom_sf(data = elpaso, aes(fill = pctDisAb.2020),
+          color = "transparent")+
+  geom_sf(data = elpaso %>%
+          st_union(),
+          color = "white",
+          fill = "transparent")+
+   scale_fill_viridis('% Disabled',
+                      direction = -1,
+                      option = 'B',
+                      alpha = 0.8)+
+  labs(
+    title = "% of residents with a disability",
+    subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
+  mapTheme
+
+pctDisabled
+```
+
+## Open Data El Paso
+
+```{r}
+road_centerlines <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = ''))
+
+bike_lanes <- read_sf(paste(data_folder, "/BikeLanesFinal.shp", sep = ''))
+bike_lanes <- bike_lanes[bike_lanes$Status != "PROPOSED", ]
+
+parks <- read_sf(paste(data_folder, "/ParkandRecreationFacilities.shp", sep = ''))
+
+#schools <- read_sf(paste(data_folder, "/Schools.shp", sep = ''))
+
+#futureLU <- read_sf(paste(data_folder, "/FutureLandUse.shp", sep = ''))
+
+TIRZ <- read_sf(paste(data_folder, "/TIRZ.shp", sep = ''))
+```
+
+```{r}
+ggplot()+
+  geom_sf(data=road_centerlines, alpha=0.1)+
+  geom_sf(data=bike_lanes, aes(color="Status"), size=1, color="#fc8961")+
+  labs(title="Existing Bike Lanes in El Paso, Texas",
+       subtitle="Data: Open Data El Paso",
+       caption="Lines in orange indicate bike lanes")+
+  theme(legend.position = "none")+
   mapTheme
 ```
 
 ```{r}
-dfRT1 <- dfRT[dfRT$avg_ons == 0, ]
-dfRT2 <- dfRT[dfRT$avg_ons < 5, ]
-dfRT3 <- dfRT[dfRT$avg_ons > 5 & dfRT$avg_ons < 10, ]
-dfRT4 <- dfRT[dfRT$avg_ons > 10, ]
-
-grid.arrange(ncol=2,
 ggplot()+
-  geom_sf(data=dfRT1, aes(color=avg_ons))+
-  scale_color_viridis(option="G")+
-  mapTheme,
-ggplot()+
-  geom_sf(data=dfRT2, aes(color=avg_ons))+
-  scale_color_viridis(option="G")+
-  mapTheme,
-ggplot()+
-  geom_sf(data=dfRT3, aes(color=avg_offs))+
-  scale_color_viridis(option="G")+
-  mapTheme,
-ggplot()+
-  geom_sf(data=dfRT4, aes(color=avg_offs))+
-  scale_color_viridis(option="G")+
+  geom_sf(data=road_centerlines, alpha=0.1)+
+  geom_sf(data=parks, aes(fill=factype), size=1, alpha=.7, color="#fc8961")+
+  labs(title="Existing Bike Lanes in El Paso, Texas",
+       subtitle="Data: Open Data El Paso",
+       caption="Lines in orange indicate bike lanes")+
+  theme(legend.position = "none")+
+  guides(fill=FALSE)+
   mapTheme
-)
 ```
 
-
-
+```{r}
+ggplot()+
+  geom_sf(data=road_centerlines, alpha=0.1)+
+  geom_sf(data=TIRZ, aes(fill="OBJECTID"), size=1, color="#fc8961", alpha=.7)+
+  labs(title="Existing Bike Lanes in El Paso, Texas",
+       subtitle="Data: Open Data El Paso",
+       caption="Lines in orange indicate bike lanes")+
+  theme(legend.position = "none")+
+  guides(fill=FALSE)+
+  mapTheme
+```
