@@ -117,12 +117,7 @@ elpaso <- get_acs(geography = "tract",
                              county = "El Paso", 
                              output = "wide") 
 
-```
 
-
-
-
-```{r rename column}
 elpaso <- elpaso %>%
   rename(
     total_pop.2020 = B01001_001E,
@@ -143,6 +138,8 @@ elpaso <- elpaso %>%
          pctNV.2020 = noV.2020/total_HU.2020*100,
          pctUnder18.2020 = under18.2020/total_pop.2020,
          pctDisAb.2020 = disAb.2020/total_pop.2020,
+         area_sqmile = st_area(geometry)/2590000,
+         pop_dense = as.numeric(total_pop.2020 / area_sqmile)
          ) %>%
   st_as_sf(crs = 4326) # Turn shp into sf object and project as WGS84
 
@@ -296,13 +293,22 @@ origin <- read_sf(paste(data_folder, "/trip_origins.geojson", sep = ''))
 ```{r}
 elpaso_outline <- elpaso %>% st_union() %>% sf::st_cast()
 
-hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F)  %>%  st_sf() %>%
-  mutate(uniqueID = rownames(.))
+hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F)  %>%  st_sf() 
 
-hex <- hex[elpaso,]
+hex <- hex[elpaso,] %>%
+  mutate(uniqueID = rownames(.))
 
 ggplot(hex)+
   geom_sf()
+```
+```{r}
+ridership_net <- 
+  dplyr::select(burglaries) %>% 
+  mutate(countBurglaries = 1) %>% 
+  aggregate(., fishnet, sum) %>%
+  mutate(countBurglaries = replace_na(countBurglaries, 0),
+         uniqueID = rownames(.),
+         cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
 ```
 
 
@@ -311,6 +317,12 @@ ggplot(hex)+
 ## Local Busses - What we get to effect!
 
 ## Model of where ridership exists 
+
+
+## hexxy stuff
+
+
+
 
 
 

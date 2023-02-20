@@ -1,0 +1,242 @@
+---
+title: "pres1 graphics"
+author: "Charlie Huemmler"
+date: "2023-02-18"
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+    code_folding: hide
+    pdf_document: default
+date: "2023-1-16"
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE,
+  warning=FALSE,
+  message=FALSE,
+  results='hide')
+```
+
+```{r}
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(tigris)
+library(boxr)
+library(lubridate)
+library(here)
+library(readxl)
+library(viridis)
+library(stplanr)
+library(paletteer)
+library(scales)
+library(gganimate)
+library(transformr)
+
+sf::sf_use_s2(FALSE)
+
+
+
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+
+```
+
+```{r}
+
+transitroutes <-  read_sf(paste(data_folder, "/transit_lines.geojson", sep = '')) %>% st_transform(crs = 4269)
+
+briolines <- transitroutes %>% filter(str_detect(route_long_name, 'BRIO'))
+
+rivers <- read_sf(paste(data_folder, "/MajorRivers_dd83.shp", sep = '')) %>%
+  st_transform(crs = 4269) %>%
+  filter(NAME == "Rio Grande") %>% 
+  st_crop(y = geo_bb(elpaso, scale_factor = 1.1)) %>% 
+  st_union() %>% 
+  st_buffer(.003)
+
+
+futureLU <- read_sf(paste(data_folder, "/FutureLandUse.shp", sep = '')) %>% st_transform(crs = 4269)
+
+bounds <- geo_bb(briolines, scale_factor = 1.5)
+
+elpas <- elpaso %>% st_crop(y = bounds)
+wat <- water %>% st_crop(y = bounds)
+flu <- futureLU %>% st_crop(y = bounds)
+
+
+ftbliss <- futureLU %>% filter(COMMENTS %in% c("Fort Bliss Military"))
+ftbliss_small <- flu %>% filter(COMMENTS %in% c("Fort Bliss Military"))
+
+airport <- futureLU %>% filter(COMMENTS %in% c("Fort Bliss Mixed Use (Airport)"))
+
+
+airport_small <- flu %>% filter(COMMENTS %in% c("Fort Bliss Mixed Use (Airport)"))
+
+
+mtns <- futureLU %>% filter(COMMENTS %in% c("Preserve")) %>% arrange(-Shape_Area) %>% slice(1:2)
+
+mtns_small <- flu %>% filter(COMMENTS %in% c("Preserve")) %>% arrange(-Shape_Area) %>% slice(1:2)
+
+juarez <- read_sf(paste(data_folder, "/ciudad-juarez-city-blocks.shp", sep = '')) %>% st_transform(crs = 4269)
+juar <- juarez  %>% st_crop(y = bounds)
+
+mxroads <-  read_sf(paste(data_folder, "/carreteras.kml", sep = '')) %>% st_transform(crs = 4269)
+#transitstops <-  read_sf(paste(data_folder, "/transit_stops.geojson", sep = ''))
+
+#brio1 <- read_sf("https://services1.arcgis.com/hyTVSIhR7dHyDsJF/arcgis/rest/services/Brio_2021/FeatureServer")
+```
+
+```{r}
+# brio bounds
+ggplot(mxroads)+
+  geom_sf()+
+  geom_sf(data = elpaso)
+
+
+
+```
+
+
+
+
+```{r}
+#map of el paso geog and pop dense
+
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = pop_dense), color = NA)+
+  geom_sf(data = ftbliss, fill = 'darkgreen', color = NA)+
+  geom_sf(data = mtns, fill = 'green', color = NA)+
+  geom_sf(data = airport, fill = 'darkgreen', color = NA)+
+  geom_sf(data = juarez, fill = NA, color = 'lightgrey', alpha = .5)+
+  geom_sf(data = rivers, fill = 'lightblue', color = NA)+
+  paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
+  labs(fill = 'Population per \nSquare Mile', title = 'Geographic Constraints of El Paso')+
+  mapTheme()
+
+
+```
+
+```{r}
+ggplot(transitroutes)+
+  geom_sf()
+
+
+ggplot()+
+  #geom_sf(data = water, fill = 'lightblue', color = NA)+
+  geom_sf(data = elpaso, aes(fill = pop_dense), color = NA, alpha =.5)+
+  geom_sf(data = ftbliss, fill = 'darkgreen', color = NA, alpha =.5)+
+  geom_sf(data = mtns, fill = 'green', color = NA, alpha =.5)+
+  geom_sf(data = airport, fill = 'darkgreen', color = NA, alpha =.5)+
+  geom_sf(data = briolines, size = 2, color = 'white')+
+ paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+  labs(fill = 'Population per \nSquare Mile', title = 'BRIO Bus Rapid Transit Lines')+
+  mapTheme()+
+  theme(legend.position = 'none') 
+
+
+
+```
+```{r}
+
+
+ggplot()+
+
+  #geom_sf(data = water, fill = 'lightblue', color = NA)+
+  geom_sf(data = elpas, aes(fill = pop_dense), color = NA)+
+  geom_sf(data = ftbliss_small, fill = 'darkgreen', color = NA)+
+  geom_sf(data = mtns_small, fill = 'green', color = NA)+
+  geom_sf(data = airport_small, fill = 'darkgreen', color = NA)+
+  geom_sf(data = briolines, size = 2, aes(color = route_long_name), alpha= 1)+
+    geom_sf(data = juar, fill = NA, color = 'lightgrey', alpha = .5)+
+
+    geom_sf(data = rivers %>% st_crop(y = bounds), fill = 'lightblue', color = NA)+
+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+  scale_color_manual(values = c('#B0C72C','#660066','#00A8E7'))+
+  ##B0C72C Alameda
+  #660066 dyer
+  #00A8E7 mesa
+  #FFFFFF montana
+  labs(fill = 'Population per \nSquare Mile', title = 'BRIO Bus Rapid Transit Lines')+
+  mapTheme()+
+  theme(legend.position = 'none')
+
+```
+invert pop dense symbology
+add 4th brio line
+  - color lines
+
+local bus routes map
+
+```{r}
+
+notbrio <- transitroutes %>% filter(!str_detect(route_long_name, 'BRIO'))
+
+
+ggplot()+
+
+  #geom_sf(data = water, fill = 'lightblue', color = NA)+
+  geom_sf(data = elpas, fill=NA, color = 'lightgrey', alpha = .3)+
+  geom_sf(data = ftbliss_small, fill = 'darkgreen', color = NA)+
+  geom_sf(data = mtns_small, fill = 'green', color = NA)+
+  geom_sf(data = airport_small, fill = 'darkgreen', color = NA)+
+  geom_sf(data = briolines, size = 2, aes(color = route_long_name), alpha= 1)+
+  geom_sf(data = notbrio)+
+    geom_sf(data = rivers %>% st_crop(y = bounds), fill = 'lightblue', color = NA)+
+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+  scale_color_manual(values = c('#B0C72C','#660066','#00A8E7'))+
+  ##B0C72C Alameda
+  #660066 dyer
+  #00A8E7 mesa
+  #FFFFFF montana
+  labs(title = 'Local Bus Routes')+
+  mapTheme()+
+  theme(legend.position = 'none')
+
+```
+
+```{r}
+
+g <- ggplot()+
+  geom_sf(data = briolines %>% select(-route_long_name), size = 1.5, aes(color = route_id))+
+
+  geom_sf(data = notbrio %>% select(-route_long_name), alpha = .75, color = 'grey')+
+  geom_sf(data = notbrio, aes(group = route_long_name), color = 'red')+
+  mapTheme()+
+  scale_color_manual(values = c('#B0C72C','#660066','#00A8E7'))+
+  labs(title = 'Sun Metro Local Bus Network',
+       subtitle = '{closest_state}')+
+  theme(legend.position = 'none')+
+  transition_states(route_long_name)+
+  exit_fade()
+
+
+anim_save('citybusses.gif', g, path = "C:/Users/cchue/Documents/Penn MUSA/Spring/Practicum",  duration = 15, fps = 10, bg = 'black')
+    
+```
+```{r}
+elpaso_outline <- elpaso %>% st_union() %>% sf::st_cast()
+
+hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F)  %>%  st_sf() 
+
+hex <- hex[elpaso,] %>%
+  mutate(uniqueID = rownames(.))
+
+ggplot(hex)+
+  geom_sf()
+```
+
+```{r}
+ridership_net <- 
+  dplyr::select(burglaries) %>% 
+  mutate(countBurglaries = 1) %>% 
+  aggregate(., fishnet, sum) %>%
+  mutate(countBurglaries = replace_na(countBurglaries, 0),
+         uniqueID = rownames(.),
+         cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
+```
+
+
