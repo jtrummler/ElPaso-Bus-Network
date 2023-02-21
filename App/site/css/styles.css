@@ -34,6 +34,27 @@ body {
     display: flex;
 }
 
+.logo{
+    height: 8rem;
+    align-self: center;
+}
+
+.button {
+    background-color: var(--color-light--1);
+    color: #fff;
+    padding: 10px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 15px;
+    margin: 3px 2px;
+    cursor: pointer;
+    border-radius:26px 6px;
+    /* border: none; */
+    border: none;
+    border-color: #38485C;
+  }
+
 #map { 
     flex: 1;
     height: 100%;
@@ -92,7 +113,7 @@ body {
 
 .list-container{
     list-style: none;
-    height: 77vh;
+    height: 200vh;
     overflow-y: scroll;
     overflow-x: hidden;
 }
