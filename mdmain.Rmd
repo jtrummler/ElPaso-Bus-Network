@@ -24,6 +24,7 @@ library(boxr)
 library(lubridate)
 library(here)
 library(readxl)
+library(gridExtra)
 
 census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
 #box_auth(client_id = "your_client_id", client_secret = "your_client_secret")
@@ -36,17 +37,21 @@ census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
 data_folder <- file.path(here() %>% dirname(), 'data')
 
 
-#stops
-stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
+# #stops
+# stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
+# 
+# #totalboardings2021
+# jan <- read_excel(paste(data_folder, "/total_boardings_2021.xlsx", sep = ""),
+#                                   sheet = "Jan-Aug")
+# 
+# sep <- read_excel(paste(data_folder, "/total_boardings_sept.xlsx", sep = ""),
+#                                   sheet = "Sept - Dec")
+# 
+# ridership <- rbind(jan, sep)
+# 
+# ridership <- write.csv(ridership, "C:/Users/jtrum/pennmusa/MUSA8010/repository/data/ridership.csv")
 
-#totalboardings2021
-jan <- read_excel(paste(data_folder, "/totalboardings2022.xlsx", sep = ""),
-                                  sheet = "Jan-Aug")
-
-sep <- read_excel(paste(data_folder, "/totalboardings2022.xlsx", sep = ""),
-                                  sheet = "Sept - Dec")
-
-ridership <- rbind(jan, sep)
+ridership <- read.csv(paste(data_folder, "/ridership.csv", sep = ''))
 
 ```
 
@@ -445,6 +450,47 @@ ggplot()+
 
 
 
+```{r}
+df <- riderstops1 %>%
+  na.omit(riderstops1[, c("stop_lat", "stop_lon")]) %>% 
+  st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4326)
+```
 
+```{r}
+dfAvg <- df %>%
+  group_by(stop_desc) %>%
+  summarize(avg_ons = mean(Ons), avg_offs = mean(Offs))
+```
 
+```{r}
+grid.arrange(ncol=2,
+ggplot()+
+  geom_sf(data=dfAvg, aes(color=avg_ons))+
+  theme_dark(),
+ggplot()+
+  geom_sf(data=dfAvg, aes(color=avg_offs))+
+  theme_dark()
+)
+```
+
+```{r}
+dfRT <- df %>%
+  group_by(RT, stop_desc) %>%
+  summarize(avg_ons = mean(Ons), avg_offs = mean(Offs))
+```
+
+```{r}
+grid.arrange(ncol=2,
+ggplot()+
+  geom_sf(data=dfRT, aes(color=avg_ons))+
+  theme_dark(),
+ggplot()+
+  geom_sf(data=dfRT, aes(color=avg_offs))+
+  theme_dark()
+)
+```
+
+```{r}
+
+```
 
