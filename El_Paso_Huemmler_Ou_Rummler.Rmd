@@ -42,6 +42,11 @@ library(htmlwidgets)
 library(magick)
 library(cowplot)
 library(paletteer)
+library(stplanr)
+library(paletteer)
+library(scales)
+library(gganimate)
+library(transformr)
 
 census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
 data_folder <- file.path(
