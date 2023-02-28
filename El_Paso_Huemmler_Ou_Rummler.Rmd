@@ -42,6 +42,11 @@ library(htmlwidgets)
 library(magick)
 library(cowplot)
 library(paletteer)
+library(stplanr)
+library(scales)
+library(gganimate)
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+
 
 census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
 data_folder <- file.path(
@@ -75,12 +80,13 @@ plotTheme <- theme(
     panel.border = element_rect(colour = "black", fill=NA, size=2)
   ) 
 
+sf::sf_use_s2(FALSE)
 options(scipen=999)
 ```
 
 # Introduction and Use Case
 
-Sun Metro is the transportation provider in the city of El Paso, Texas. Sun Metro has made several expansions in the past decase, particularly adding four bus rapid transit (BRT) lines, adding the streetcar network, and a new transit center. With many transit agencies in the last decade, there has been a yearly decrease in bus ridership, with a sharp decrease at the start of the COVID-19 pandemic. Now, Sun Metro experiences about 63% of pre-pandemic ridership numbers, but the agency is looking to explore the implications of new bus transit services.
+Sun Metro is the transportation provider in the city of El Paso, Texas. Sun Metro has made several expansions in the past decade, particularly adding four bus rapid transit (BRT) lines, adding the streetcar network, and a new transit center. With many transit agencies in the last decade, there has been a yearly decrease in bus ridership, with a sharp decrease at the start of the COVID-19 pandemic. Now, Sun Metro experiences about 63% of pre-pandemic ridership numbers, but the agency is looking to explore the implications of new bus transit services.
 
 The four BRIO lines currently have the greatest ridership and frequency, accounting for 40% of current ridership. Local bus routes and BRIO lines account for 65% of system ridership. As BRIO stops are spaced out every 3/4 to 1 mile, the agency is seeking ways to connect local bus transit routes to BRIO lines, accommodating issues associated with the first-mile/last-mile problem. Within new bus transit alternatives, Sun Metro wants to maximize both financial profitability of routes and equity/accessibility concerns.
 
@@ -108,7 +114,7 @@ riderstops1 <- read.csv(paste(data_folder, "/riderstops1.csv", sep = ''))
 
 df <- riderstops1 %>%
   na.omit(riderstops1[, c("stop_lat", "stop_lon")]) %>% 
-  st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4326)
+  st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4269)
 
 df$longitude <- st_coordinates(df$geometry)[, "X"]
 df$latitude <- st_coordinates(df$geometry)[, "Y"]
@@ -133,7 +139,7 @@ dfRTsum <- df %>%
 
 dfRTsum1 <- st_drop_geometry(dfRTsum)
 
-transit_lines <- st_read("C:/Users/jtrum/pennmusa/MUSA8010/repository/data/transit_lines.geojson")
+transit_lines <- st_read(paste(data_folder, "/transit_lines.geojson", sep = ''))
 merged <- merge(transit_lines, dfRTsum1, by.x = "route_short_name", by.y = "RT")
 ```
 
@@ -177,7 +183,7 @@ ggplot(dfRT_nogeom, aes(x = avg_ons, y = avg_offs)) +
        title = "Scatterplot of on-boarding and off-boarding", 
        subtitle="Average values grouped by route and stop information")+
   geom_smooth(method = lm, se=FALSE, colour = "#C96A52FF", size=1, )+
-  geom_abline(intecept=0, slope=1, color="#C96A52FF", alpha=0.3, size=1, style='dashed')+
+  geom_abline(intercept=0, slope=1, color="#C96A52FF", alpha=0.3, size=1, style='dashed')+
   plotTheme
 ```
 
@@ -254,7 +260,7 @@ LL2
 
 Next, we analyzed census data at the tract level from the 2020 American Community Survey. We particularly focused on demographic and socioeconomic indicators that we predicted to be correlated to transit ridership demand.
 
-```{r census data, message=FALSE, warning=FALSE}
+```{r}
 censusvars <- c("B01001_001E", # ACS total Pop estimate
               "B25002_001E", # Estimate of total housing units
               "B25002_003E", # Number of vacant housing units
@@ -277,6 +283,7 @@ elpaso <- get_acs(geography = "tract",
                              county = "El Paso", 
                              output = "wide") 
 
+
 elpaso <- elpaso %>%
   rename(
     total_pop.2020 = B01001_001E,
@@ -291,19 +298,23 @@ elpaso <- elpaso %>%
     disAb.2020 = B10052_002E,
     Value = B25075_001E
   ) %>%
-    mutate(vacancyPct.2020 = total_vacant.2020/total_HU.2020*100,
-         pctWhite.2020 = total_White.2020/total_pop.2020*100,
-         pctHL.2020 = total_HL.2020/total_pop.2020*100,
+    mutate(vacancyPct.2020 = total_vacant.2020/total_HU.2020,
+         pctWhite.2020 = total_White.2020/total_pop.2020,
+         pctHL.2020 = total_HL.2020/total_pop.2020,
          pctNV.2020 = noV.2020/total_HU.2020*100,
-         pctUnder18.2020 = under18.2020/total_pop.2020*100,
-         pctDisAb.2020 = disAb.2020/total_pop.2020*100,
+         pctUnder18.2020 = under18.2020/total_pop.2020,
+         pctDisAb.2020 = disAb.2020/total_pop.2020,
+         area_sqmile = st_area(geometry)/2590000,
+         pop_dense = as.numeric(total_pop.2020 / area_sqmile)
          ) %>%
-  st_as_sf(crs = 4326) # Turn shp into sf object and project as WGS84
+  st_as_sf(crs = 4269) 
+
 ```
 
 
 ### Median household income
 ```{r medhhinc, warning = FALSE, cache = TRUE}
+
 medHHInc <- 
   ggplot()+
   geom_sf(data = elpaso, aes(fill =  med_HH_Income.2020),
@@ -554,3 +565,161 @@ ggplot()+
   mapTheme
 ```
 
+
+# Bus Network and Maps
+
+
+
+```{r}
+
+transitroutes <- transit_lines
+briolines <- transitroutes %>% filter(str_detect(route_long_name, 'BRIO')) %>%
+  st_transform(crs = 4269) 
+
+rivers <- read_sf(paste(data_folder, "/MajorRivers_dd83.shp", sep = '')) %>%
+  st_transform(crs = 4269) %>%
+  filter(NAME == "Rio Grande") %>% 
+  st_crop(y = geo_bb(elpaso, scale_factor = 1.1)) %>% 
+  st_union() %>% 
+  st_buffer(.003)
+
+
+futureLU <- read_sf(paste(data_folder, "/FutureLandUse.shp", sep = '')) %>% st_transform(crs = 4269)
+
+bounds <- geo_bb(briolines, scale_factor = 1.5)
+
+elpas <- elpaso %>% st_crop(y = bounds)
+riv <- rivers %>% st_crop(y = bounds)
+flu <- futureLU %>% st_crop(y = bounds)
+
+
+ftbliss <- futureLU %>% filter(COMMENTS %in% c("Fort Bliss Military"))
+ftbliss_small <- flu %>% filter(COMMENTS %in% c("Fort Bliss Military"))
+
+airport <- futureLU %>% filter(COMMENTS %in% c("Fort Bliss Mixed Use (Airport)"))
+
+
+airport_small <- flu %>% filter(COMMENTS %in% c("Fort Bliss Mixed Use (Airport)"))
+
+
+mtns <- futureLU %>% filter(COMMENTS %in% c("Preserve")) %>% arrange(-Shape_Area) %>% slice(1:2)
+
+mtns_small <- flu %>% filter(COMMENTS %in% c("Preserve")) %>% arrange(-Shape_Area) %>% slice(1:2)
+```
+
+
+
+
+
+```{r}
+#map of el paso geog and pop dense
+
+ggplot()+
+  geom_sf(data = elpaso, aes(fill = pop_dense), color = NA)+
+  geom_sf(data = ftbliss, fill = 'darkgreen', color = NA)+
+  geom_sf(data = mtns, fill = 'green', color = NA)+
+  geom_sf(data = airport, fill = 'darkgreen', color = NA)+
+  #geom_sf(data = juarez, fill = NA, color = 'lightgrey', alpha = .5)+
+  geom_sf(data = rivers, fill = 'lightblue', color = NA)+
+  paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
+  labs(fill = 'Population per \nSquare Mile', title = '')+
+  theme(legend.position = 'left')+
+  mapTheme
+
+
+```
+
+
+```{r}
+
+
+ggplot()+
+
+  #geom_sf(data = water, fill = 'lightblue', color = NA)+
+  geom_sf(data = elpas, aes(fill = pop_dense), color = NA)+
+  geom_sf(data = ftbliss_small, fill = 'darkgreen', color = NA)+
+  geom_sf(data = mtns_small, fill = 'green', color = NA)+
+  geom_sf(data = airport_small, fill = 'darkgreen', color = NA)+
+  geom_sf(data = briolines, size = 2, aes(color = route_long_name), alpha= 1)+
+   # geom_sf(data = juar, fill = NA, color = 'lightgrey', alpha = .5)+
+
+    geom_sf(data = rivers %>% st_crop(y = bounds), fill = 'lightblue', color = NA)+
+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+  scale_color_manual(values = c('#B0C72C','#660066','#00A8E7'))+
+  ##B0C72C Alameda
+  #660066 dyer
+  #00A8E7 mesa
+  #FFFFFF montana
+  labs(fill = 'Population per \nSquare Mile', title = '')+
+  mapTheme+
+  theme(legend.position = 'none')
+
+```
+
+
+
+
+
+
+```{r anim, cache=TRUE, results='markup'}
+
+notbrio <- transitroutes %>% filter(!str_detect(route_long_name, 'BRIO'))
+
+
+g <- ggplot()+
+  geom_sf(data = briolines %>% select(-route_long_name), size = 1.5, aes(color = route_id))+
+
+  geom_sf(data = notbrio %>% select(-route_long_name), alpha = .75, color = 'grey')+
+  geom_sf(data = notbrio, aes(group = route_long_name), color = 'red')+
+  mapTheme+
+  scale_color_manual(values = c('#B0C72C','#660066','#00A8E7'))+
+  labs(title = 'Sun Metro Local Bus Network',
+       subtitle = '{closest_state}')+
+  theme(legend.position = 'none')+
+  transition_states(route_long_name)+
+  exit_fade()
+
+
+animate(g, duration = 15, fps = 10, bg = 'black')
+    
+```
+
+
+# Modeling
+
+We are building a zero-inflated Poisson regression model, aggregating our ridership data and engineered features into hexbins, to predict latent demand for bus services.
+
+```{r}
+
+elpaso_outline <- elpaso %>% st_union() %>% sf::st_cast()
+
+hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F)  %>%  st_sf() 
+
+hex <- hex[elpaso,] %>%
+  mutate(uniqueID = rownames(.))
+```
+
+```{r}
+
+riderstops_sf <- read_csv(paste(data_folder, "/riderstops1.csv", sep = '')) %>%
+  filter(!is.na(stop_lat)) %>%
+  st_as_sf(coords = c('stop_lon', 'stop_lat'), crs = 4269) 
+
+stop_riders_agg <- riderstops_sf %>% group_by(TP) %>% summarise(ridership = sum(Ons) + sum(Offs))
+
+ridership_net <- stop_riders_agg %>% 
+  dplyr::select(ridership) %>% 
+  aggregate(., hex, sum) %>%
+  mutate(ridership = replace_na(ridership, 0))
+
+```
+
+```{r}
+ggplot(ridership_net %>% st_crop(y= bounds) %>% filter(ridership > 0))+
+  geom_sf(aes(fill = ridership), color = NA)+
+  geom_sf(data = ridership_net %>% st_crop(y= bounds) %>%  filter(ridership == 0), color = NA, fill = '#fbfae4')+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels = comma)+
+  labs(title = "Ridership Per Hexbin", subtitle = "Downtown has an exceptional amount of ridership")+
+  mapTheme
+```
