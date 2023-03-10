@@ -41,15 +41,15 @@ data_folder <- file.path(here() %>% dirname(), 'data')
 # stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
 # 
 # #totalboardings2021
-# jan <- read_excel(paste(data_folder, "/total_boardings_2021.xlsx", sep = ""),
-#                                   sheet = "Jan-Aug")
+ jan <- read_excel(paste(data_folder, "/totalboardings2022.xlsx", sep = ""),
+                                   sheet = "Jan-Aug")
+ 
+ sep <- read_excel(paste(data_folder, "/totalboardings2022.xlsx", sep = ""),
+                                   sheet = "Sept - Dec")
 # 
-# sep <- read_excel(paste(data_folder, "/total_boardings_sept.xlsx", sep = ""),
-#                                   sheet = "Sept - Dec")
+ ridership <- rbind(jan, sep)
 # 
-# ridership <- rbind(jan, sep)
-# 
-# ridership <- write.csv(ridership, "C:/Users/jtrum/pennmusa/MUSA8010/repository/data/ridership.csv")
+ write.csv(ridership, "C:/Users/cchue/Documents/Penn MUSA/Spring/Practicum/data/ridership.csv")
 
 ridership <- read.csv(paste(data_folder, "/ridership.csv", sep = ''))
 

@@ -24,7 +24,6 @@ library(sf)
 library(tidyverse)
 library(tidycensus)
 library(tigris)
-library(boxr)
 library(lubridate)
 library(here)
 library(readxl)
@@ -257,7 +256,7 @@ g <- ggplot()+
 
   geom_sf(data = notbrio %>% select(-route_long_name), alpha = .75, color = 'grey')+
   geom_sf(data = notbrio, aes(group = route_long_name), color = 'red')+
-  mapTheme()+
+  mapTheme+
   scale_color_manual(values = c('#B0C72C','#660066','#00A8E7'))+
   labs(title = 'Sun Metro Local Bus Network',
        subtitle = '{closest_state}')+
@@ -265,6 +264,7 @@ g <- ggplot()+
   transition_states(route_long_name)+
   exit_fade()
 
+animate(g, duration = 15, fps = 10, bg = 'black')
 
 anim_save('citybusses.gif', g, path = "C:/Users/cchue/Documents/Penn MUSA/Spring/Practicum",  duration = 15, fps = 10, bg = 'black')
     

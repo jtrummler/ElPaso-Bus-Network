@@ -29,17 +29,22 @@
 
   <body>
     <div class="sidebar">
-
-        <div>
+        <img src="./image/logo.png" alt="Logo" class="logo"/>
+        <!-- <div>
             <h1 class="h1">El Paso Bus System</h1>
-        </div>
+        </div> -->
+        
+        <form class="button_list">
+            <button class="button" >GitHub pages</button>
+            <button class="button" >Import routes</button>
+        </form>
 
         <ul class="list-container">
-            <h2>Current data visulization</h2>
+            <!-- <h2>Current data visulization</h2> -->
             <input type="checkbox" id="myCheck" onclick="checkbox()">
-            <label for="myCheck" class="label">Current ridership</label> 
+            <label for="myCheck" class="label">Current bus routes ridership</label> 
             <input type="range" min="1" max="100" value="50" class="slider" id="ridership">
-            
+
             <input type="checkbox" id="myCheck" onclick="checkbox()">
             <label for="myCheck" class="label">Density of bus stops/routes</label> 
             <input type="range" min="1" max="100" value="50" class="slider" id="density">
@@ -51,7 +56,7 @@
         </ul>
 
         <ul class="graph-container">
-            <h2>Graph</h2>
+            <h2>Hex ID: XXX    Ridership Prediction: XXX</h2>
             <canvas id="pieChart" style="width:100%;max-width:600px"></canvas>
             <script>
                 var xValues = ["White", "Hispanic", "Black", "Others"];
