@@ -132,7 +132,13 @@ road_centerlines <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = ''))
 ```{r find stops without ridership data, warning = FALSE, message = FALSE, results=FALSE}
 dfRTx <- df %>%
   group_by(RT, stop_desc, longitude, latitude) %>%
-  summarize(avg_ons = mean(Ons), avg_offs = mean(Offs))
+  summarize(avg_ons = mean(Ons), 
+            avg_offs = mean(Offs))
+
+sum_by_stops <- df %>%
+  group_by(TP, longitude, latitude) %>%
+  summarize(total_ons = sum(Ons), 
+            total_offs = sum(Offs))
 
 dfRTx_5on <- dfRTx[dfRTx$avg_ons > 5, ]
 dfRTx_5off <- dfRTx[dfRTx$avg_offs > 5, ]
@@ -181,40 +187,40 @@ ggplot(dfRT_nogeom, aes(x=avg_offs))+
 merged_sorted <- merged %>%
   arrange(desc(total_ons))
 
-# Create the ggplot object
-q <- ggplot() + 
-  geom_sf(data = merged_sorted, aes(color = total_ons), size=16) +
-  scale_color_paletteer_c("grDevices::Red-Yellow", -1)+  
-  mapTheme+
-  labs(title = "Total Onboarding per Route (2022)",
-          subtitle = "{route_long_name}",
-          caption = "Total Onboards: {total_ons}") +
-  transition_states(total_ons, 
-                    transition_length = 1, 
-                    state_length = 1, 
-                    wrap = FALSE, 
-                    transition_components = c("route_long_name", "total_ons")) +
-  exit_fade() 
+# # Create the ggplot object
+# q <- ggplot() + 
+#   geom_sf(data = merged_sorted, aes(color = total_ons), size=16) +
+#   scale_color_paletteer_c("grDevices::Red-Yellow", -1)+  
+#   mapTheme+
+#   labs(title = "Total Onboarding per Route (2022)",
+#           subtitle = "{route_long_name}",
+#           caption = "Total Onboards: {total_ons}") +
+#   transition_states(total_ons, 
+#                     transition_length = 1, 
+#                     state_length = 1, 
+#                     wrap = FALSE, 
+#                     transition_components = c("route_long_name", "total_ons")) +
+#   exit_fade() 
+# 
+# q
+# 
+# merged_sorted <- merged[order(-merged$total_ons),]
 
-q
-
-merged_sorted <- merged[order(-merged$total_ons),]
-
-# Create a ggplot object
-ggplot() + 
-  geom_sf(data = merged_sorted, aes(color = total_ons), size=6) +
-  scale_color_paletteer_c("grDevices::Red-Yellow", -1)+
-  labs(title = "Total Onboarding per Route (2022)",
-       subtitle = paste("Route: <i>", "{route_short_name}</i>"),
-       caption = paste("Total Onboards: <b>", "{total_ons}</b>")) +
-  mapTheme +
-  transition_states(route_short_name) +
-  exit_fade() +
-  theme(plot.subtitle = element_markdown())
-
-animate(q, duration = 15, fps = 10, bg = 'black')
-
-anim_save('q.gif', q, path = "C:/Users/jtrum/Desktop/MUSA8010",  duration = 15, fps = 10, bg = 'black')
+# # Create a ggplot object
+# ggplot() + 
+#   geom_sf(data = merged_sorted, aes(color = total_ons), size=6) +
+#   scale_color_paletteer_c("grDevices::Red-Yellow", -1)+
+#   labs(title = "Total Onboarding per Route (2022)",
+#        subtitle = paste("Route: <i>", "{route_short_name}</i>"),
+#        caption = paste("Total Onboards: <b>", "{total_ons}</b>")) +
+#   mapTheme +
+#   transition_states(route_short_name) +
+#   exit_fade() +
+#   theme(plot.subtitle = element_markdown())
+# 
+# animate(q, duration = 15, fps = 10, bg = 'black')
+# 
+# anim_save('q.gif', q, path = "C:/Users/jtrum/Desktop/MUSA8010",  duration = 15, fps = 10, bg = 'black')
 ```
 
 ```{r}
@@ -351,18 +357,81 @@ LL2
 
 Next, we analyzed census data at the tract level from the 2020 American Community Survey. We particularly focused on demographic and socioeconomic indicators that we predicted to be correlated to transit ridership demand.
 
+```{r ridership per census tract}
+
+ep_tx_tracts <- get_acs(
+  geography = "tract", 
+  variables = "B01001_001E",
+  county = "El Paso",
+  state = "TX", 
+  year = 2020,
+  geometry = TRUE,
+) 
+
+st_crs(ep_tx_tracts) <- st_crs(4269)
+st_crs(sum_by_stops) <- st_crs(4269)
+  
+
+ridership_by_tract <- st_join(ep_tx_tracts, sum_by_stops, join = st_intersects)
+
+riderhsip_by_tract <- ridership_by_tract %>%
+  group_by(NAME) %>%
+  summarize(ons = sum(total_ons), 
+            offs = sum(total_offs)) %>%
+  dplyr::f
+
+# create two ggplot objects, one for ons and one for offs
+p_ons <- ggplot() +
+  geom_sf(data = riderhsip_by_tract, aes(fill = ons), color="transparent") +
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1) +
+  labs(title = "Onboard Counts") +
+  mapTheme
+
+p_offs <- ggplot() +
+  geom_sf(data = riderhsip_by_tract, aes(fill = offs), color="transparent") +
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1) +
+  labs(title = "Offboard Counts") +
+  mapTheme
+
+# arrange the two plots side by side using facet_wrap
+gridExtra::grid.arrange(p_ons, p_offs, ncol = 2)
+
+```
+
+
 ```{r}
+acs_variable_list.2020 <- load_variables(2020,
+                                         "acs5",
+                                         cache = TRUE)
+
 censusvars <- c("B01001_001E", # ACS total Pop estimate
               "B25002_001E", # Estimate of total housing units
               "B25002_003E", # Number of vacant housing units
               "B19013_001E", # Median HH Income ($)
-              "B02001_002E", # People describing themselves as "white alone"
-              "B06009_006E",
-              "B01001I_001E", # Hispanic or Latino 
-              "B08014_001E",
+              "B25075_001E", # House value
+              
+              "B01001I_001E", # Hispanic/Latino population
+              "B02001_002E", # White 
+              "B02001_003E", # Black 
+              "B02001_004E", # American Indian/Alaskan Native
+              "B02001_005E", # Asiana
+              "B02001_006E", # Native Hawaiian
+              "B02001_007E", # Other
+              "B02001_008E", # Two plus races
+              "B02001_009E", 
+              "B02001_010E", 
+              
+              
+              "B06009_002E", # Less than high school
+              "B06009_003E", # High school or equivalent
+              "B06009_004E", # Some college or associate's degree
+              "B06009_005E", # Bachelor's degree
+              "B06009_006E", # Graduate degree
+              
+              "B08014_001E", # Sex by workers by household vehicles available
               "B09001_002E", # Population under 18
               "B10052_002E", # Disability
-              "B25075_001E", # House value
+
               "B08014_002E") # No vehicle available
 
 
@@ -416,11 +485,11 @@ medHHInc <-
           fill = "transparent")+
   scale_fill_paletteer_c("grDevices::Red-Yellow", -1,
                           name="$")+
-  geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.4) +
-  geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.4) +
-  scale_color_manual(name = "Stop Ridership Data", 
-                     values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
-                     labels = c("Average Ons > 5", "Average Offs > 5")) +
+  # geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.4) +
+  # geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.4) +
+  # scale_color_manual(name = "Stop Ridership Data", 
+  #                    values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
+  #                    labels = c("Average Ons > 5", "Average Offs > 5")) +
   labs(
     title = "Median household income",
     subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
