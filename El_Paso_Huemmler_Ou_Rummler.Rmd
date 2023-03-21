@@ -53,12 +53,20 @@ library(glue)
 library(ggtext)
 library(gapminder)
 library(ggplot2)
+library(osmdata)
+install.packages("walkscoreapi")
+library(walkscoreapi)
+
+
+
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
 census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
 data_folder <- file.path(
   here() %>% 
     dirname(), 'data')
+
+data_folder <- "C:/Users/jtrum/Desktop/MUSA8010/data"
 
 mapTheme <- theme(
     text = element_text( color = "black"),
@@ -117,110 +125,256 @@ stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
 stops_sf <- stops %>% 
   st_as_sf(coords = c('stop_lon','stop_lat')) 
 
-riderstops1 <- read.csv(paste(data_folder, "/riderstops1.csv", sep = ''))
+riderstops <- read.csv(paste(data_folder, "/riderstops1.csv", sep = ''))
 
-df <- riderstops1 %>%
-  na.omit(riderstops1[, c("stop_lat", "stop_lon")]) %>% 
+df <- riderstops %>%
+  na.omit(riderstops[, c("stop_lat", "stop_lon")]) %>% 
   st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4269)
 
 df$longitude <- st_coordinates(df$geometry)[, "X"]
 df$latitude <- st_coordinates(df$geometry)[, "Y"]
 
+df$RT <- as.numeric(df$RT)
+
+df <- df %>%
+  mutate(
+    type = case_when(
+      RT == 2 ~ "Local",
+      RT == 7 ~ "Local",
+      RT == 10 ~ "Local",
+      RT == 14 ~ "Local",
+      RT == 15 ~ "Local",
+      RT == 24 ~ "Local",
+      RT == 25 ~ "Local",
+      RT == 32 ~ "Local",
+      RT == 33 ~ "Local",
+      RT == 34 ~ "Local",
+      RT == 35 ~ "Local",
+      RT == 36 ~ "Local",
+      RT == 37 ~ "Local",
+      RT == 50 ~ "Local",
+      RT == 51 ~ "Local",
+      RT == 52 ~ "Local",
+      RT == 53 ~ "Local",
+      RT == 54 ~ "Local",
+      RT == 58 ~ "Local",
+      RT == 61 ~ "Local",
+      RT == 62 ~ "Local",
+      RT == 63 ~ "Local",
+      RT == 64 ~ "Local",
+      RT == 65 ~ "Local",
+      RT == 66 ~ "Local",
+      RT == 67 ~ "Local",
+      RT == 68 ~ "Local",
+      RT == 69 ~ "Local",
+      RT == 72 ~ "Local",
+      RT == 74 ~ "Local",
+      RT == 86 ~ "Local",
+      RT == 4 ~ "Circulator",
+      RT == 8 ~ "Circulator",
+      RT == 5 ~ "Express",
+      RT == 6 ~ "Express",
+      RT == 26 ~ "Express",
+      RT == 59 ~ "Express",
+      RT == 76 ~ "Express",
+      RT == 11 ~ "Feeder",
+      RT == 12 ~ "Feeder",
+      RT == 13 ~ "Feeder",
+      RT == 16 ~ "Feeder",
+      RT == 19 ~ "Feeder",
+      RT == 43 ~ "Feeder",
+      RT == 44 ~ "Feeder",
+      RT == 46 ~ "Feeder",
+      RT == 56 ~ "Feeder",
+      RT == 60 ~ "Feeder",
+      RT == 84 ~ "Feeder",
+      RT == 89 ~ "Feeder",
+      RT == 205 ~ "BRIO",
+      RT == 206 ~ "BRIO",
+      RT == 207 ~ "BRIO",
+      RT == 208 ~ "BRIO",
+      RT == 17 ~ "Other",
+      RT == 20 ~ "Other",
+      RT == 21 ~ "Other",
+      RT == 41 ~ "Other",
+      RT == 82 ~ "Other",
+      RT == 87 ~ "Other",
+      RT == 500 ~ "Streetcar"
+    )
+  )
+
 road_centerlines <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = ''))
 ```
 
 ```{r find stops without ridership data, warning = FALSE, message = FALSE, results=FALSE}
-dfRTx <- df %>%
-  group_by(RT, stop_desc, longitude, latitude) %>%
+RT_stop_avg <- df %>%
+  group_by(RT, TP, longitude, latitude) %>%
   summarize(avg_ons = mean(Ons), 
-            avg_offs = mean(Offs))
+            avg_offs = mean(Offs)) %>%
+   mutate(
+    type = case_when(
+      RT == 2 ~ "Local",
+      RT == 7 ~ "Local",
+      RT == 10 ~ "Local",
+      RT == 14 ~ "Local",
+      RT == 15 ~ "Local",
+      RT == 24 ~ "Local",
+      RT == 25 ~ "Local",
+      RT == 32 ~ "Local",
+      RT == 33 ~ "Local",
+      RT == 34 ~ "Local",
+      RT == 35 ~ "Local",
+      RT == 36 ~ "Local",
+      RT == 37 ~ "Local",
+      RT == 50 ~ "Local",
+      RT == 51 ~ "Local",
+      RT == 52 ~ "Local",
+      RT == 53 ~ "Local",
+      RT == 54 ~ "Local",
+      RT == 58 ~ "Local",
+      RT == 61 ~ "Local",
+      RT == 62 ~ "Local",
+      RT == 63 ~ "Local",
+      RT == 64 ~ "Local",
+      RT == 65 ~ "Local",
+      RT == 66 ~ "Local",
+      RT == 67 ~ "Local",
+      RT == 68 ~ "Local",
+      RT == 69 ~ "Local",
+      RT == 72 ~ "Local",
+      RT == 74 ~ "Local",
+      RT == 86 ~ "Local",
+      RT == 4 ~ "Circulator",
+      RT == 8 ~ "Circulator",
+      RT == 5 ~ "Express",
+      RT == 6 ~ "Express",
+      RT == 26 ~ "Express",
+      RT == 59 ~ "Express",
+      RT == 76 ~ "Express",
+      RT == 11 ~ "Feeder",
+      RT == 12 ~ "Feeder",
+      RT == 13 ~ "Feeder",
+      RT == 16 ~ "Feeder",
+      RT == 19 ~ "Feeder",
+      RT == 43 ~ "Feeder",
+      RT == 44 ~ "Feeder",
+      RT == 46 ~ "Feeder",
+      RT == 56 ~ "Feeder",
+      RT == 60 ~ "Feeder",
+      RT == 84 ~ "Feeder",
+      RT == 89 ~ "Feeder",
+      RT == 205 ~ "BRIO",
+      RT == 206 ~ "BRIO",
+      RT == 207 ~ "BRIO",
+      RT == 208 ~ "BRIO",
+      RT == 17 ~ "Other",
+      RT == 20 ~ "Other",
+      RT == 21 ~ "Other",
+      RT == 41 ~ "Other",
+      RT == 82 ~ "Other",
+      RT == 87 ~ "Other",
+      RT == 500 ~ "Streetcar"
+    )
+  )
 
-sum_by_stops <- df %>%
-  group_by(TP, longitude, latitude) %>%
-  summarize(total_ons = sum(Ons), 
-            total_offs = sum(Offs))
+RT_stop_avg_5on <- RT_stop_avg[RT_stop_avg$avg_ons > 5, ]
+RT_stop_avg_5off <- RT_stop_avg[RT_stop_avg$avg_offs > 5, ]
 
-dfRTx_5on <- dfRTx[dfRTx$avg_ons > 5, ]
-dfRTx_5off <- dfRTx[dfRTx$avg_offs > 5, ]
-
-dfRTsum <- df %>%
+RT_avg_sum <- df %>%
   group_by(RT) %>%
   summarize(avg_ons = mean(Ons), 
              avg_offs = mean(Offs),
              total_ons = sum(Ons),
-             total_offs = sum(Offs))
+             total_offs = sum(Offs)) %>%
+  mutate(
+    type = case_when(
+      RT == 2 ~ "Local",
+      RT == 7 ~ "Local",
+      RT == 10 ~ "Local",
+      RT == 14 ~ "Local",
+      RT == 15 ~ "Local",
+      RT == 24 ~ "Local",
+      RT == 25 ~ "Local",
+      RT == 32 ~ "Local",
+      RT == 33 ~ "Local",
+      RT == 34 ~ "Local",
+      RT == 35 ~ "Local",
+      RT == 36 ~ "Local",
+      RT == 37 ~ "Local",
+      RT == 50 ~ "Local",
+      RT == 51 ~ "Local",
+      RT == 52 ~ "Local",
+      RT == 53 ~ "Local",
+      RT == 54 ~ "Local",
+      RT == 58 ~ "Local",
+      RT == 61 ~ "Local",
+      RT == 62 ~ "Local",
+      RT == 63 ~ "Local",
+      RT == 64 ~ "Local",
+      RT == 65 ~ "Local",
+      RT == 66 ~ "Local",
+      RT == 67 ~ "Local",
+      RT == 68 ~ "Local",
+      RT == 69 ~ "Local",
+      RT == 72 ~ "Local",
+      RT == 74 ~ "Local",
+      RT == 86 ~ "Local",
+      RT == 4 ~ "Circulator",
+      RT == 8 ~ "Circulator",
+      RT == 5 ~ "Express",
+      RT == 6 ~ "Express",
+      RT == 26 ~ "Express",
+      RT == 59 ~ "Express",
+      RT == 76 ~ "Express",
+      RT == 11 ~ "Feeder",
+      RT == 12 ~ "Feeder",
+      RT == 13 ~ "Feeder",
+      RT == 16 ~ "Feeder",
+      RT == 19 ~ "Feeder",
+      RT == 43 ~ "Feeder",
+      RT == 44 ~ "Feeder",
+      RT == 46 ~ "Feeder",
+      RT == 56 ~ "Feeder",
+      RT == 60 ~ "Feeder",
+      RT == 84 ~ "Feeder",
+      RT == 89 ~ "Feeder",
+      RT == 205 ~ "BRIO",
+      RT == 206 ~ "BRIO",
+      RT == 207 ~ "BRIO",
+      RT == 208 ~ "BRIO",
+      RT == 17 ~ "Other",
+      RT == 20 ~ "Other",
+      RT == 21 ~ "Other",
+      RT == 41 ~ "Other",
+      RT == 82 ~ "Other",
+      RT == 87 ~ "Other",
+      RT == 500 ~ "Streetcar"
+    )
+  )
 
-dfRTsum1 <- st_drop_geometry(dfRTsum)
+RT_avg_sum_st <- st_drop_geometry(RT_avg_sum)
 
 transit_lines <- st_read(paste(data_folder, "/transit_lines.geojson", sep = ''))
-merged <- merge(transit_lines, dfRTsum1, by.x = "route_short_name", by.y = "RT")
+merged <- merge(transit_lines, RT_avg_sum_st, by.x = "route_short_name", by.y = "RT")
 ```
 
+```{r ridership line type,  warning = FALSE, message = FALSE, results=FALSE}
+ggplot(RT_avg_sum_st,
+       aes(x=total_ons,
+           y=total_offs,
+           color=type,
+           alpha=0.4))+
+  geom_point(size=5)+
+  labs(title="Total onboarding and offboarding per route",
+       subtitle="Color indicates type of transit")+
+  plotTheme
+  
+```
+
+
 ```{r}
-dfRT_nogeom <- dfRTx %>%
+RT_stop_avg_st <- RT_stop_avg %>%
   select(-geometry)
-
-any(dfRT_nogeom$avg_ons == 0)
-
-grid.arrange(ncol=2,
-ggplot(dfRT_nogeom, aes(x=avg_ons))+
-  geom_density(color="black", fill="blue")+
-  labs(title="Density Plot - Average Ons")+
-  plotTheme,
-ggplot(dfRT_nogeom, aes(x=avg_ons))+
-  geom_density(color="black", fill="blue")+
-    labs(title="Density Plot - Average Ons (5 to 50)")+
-  xlim(5, 50)+
-  plotTheme,
-ggplot(dfRT_nogeom, aes(x=avg_offs))+
-  geom_density(color="black", fill="blue")+
-  labs(title="Density Plot - Average Offs")+
-  plotTheme,
-ggplot(dfRT_nogeom, aes(x=avg_offs))+
-  geom_density(color="black", fill="blue")+
-    labs(title="Density Plot - Average Offs (5 to 50)")+
-  xlim(5, 50)+
-  plotTheme)
-```
-
-```{r}
-merged_sorted <- merged %>%
-  arrange(desc(total_ons))
-
-# # Create the ggplot object
-# q <- ggplot() + 
-#   geom_sf(data = merged_sorted, aes(color = total_ons), size=16) +
-#   scale_color_paletteer_c("grDevices::Red-Yellow", -1)+  
-#   mapTheme+
-#   labs(title = "Total Onboarding per Route (2022)",
-#           subtitle = "{route_long_name}",
-#           caption = "Total Onboards: {total_ons}") +
-#   transition_states(total_ons, 
-#                     transition_length = 1, 
-#                     state_length = 1, 
-#                     wrap = FALSE, 
-#                     transition_components = c("route_long_name", "total_ons")) +
-#   exit_fade() 
-# 
-# q
-# 
-# merged_sorted <- merged[order(-merged$total_ons),]
-
-# # Create a ggplot object
-# ggplot() + 
-#   geom_sf(data = merged_sorted, aes(color = total_ons), size=6) +
-#   scale_color_paletteer_c("grDevices::Red-Yellow", -1)+
-#   labs(title = "Total Onboarding per Route (2022)",
-#        subtitle = paste("Route: <i>", "{route_short_name}</i>"),
-#        caption = paste("Total Onboards: <b>", "{total_ons}</b>")) +
-#   mapTheme +
-#   transition_states(route_short_name) +
-#   exit_fade() +
-#   theme(plot.subtitle = element_markdown())
-# 
-# animate(q, duration = 15, fps = 10, bg = 'black')
-# 
-# anim_save('q.gif', q, path = "C:/Users/jtrum/Desktop/MUSA8010",  duration = 15, fps = 10, bg = 'black')
 ```
 
 ```{r}
@@ -273,7 +427,7 @@ Highest onboarding and offboarding ridership is among BRIO lines. There seems to
 ### Correlations between on-boarding and off-boarding
 
 ```{r scatterplot1, warning = FALSE, message = FALSE, results=FALSE}
-ggplot(dfRT_nogeom, aes(x = avg_ons, y = avg_offs)) +
+ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   geom_point() +
   labs(x = "Average on-boarding", 
        y = "Average off-boarding", 
@@ -289,24 +443,24 @@ As the scatter plot indicates, there is a strong correlation between average on-
 ### Leaflet Maps - Average ridership
 
 ```{r leaflet 1, warning = FALSE, message = FALSE, results=FALSE}
-jenks_breaks <- classIntervals(dfRTx$avg_ons, n = 9, style = "jenks")$brks
+jenks_breaks <- classIntervals(RT_stop_avg$avg_ons, n = 8, style = "jenks")$brks
 
-colors <- colorRampPalette(magma(9))
+colors <- c("#7D0112FF", "#9A4221FF", "#BF7B42FF", "#E0BA79FF", "#F0E4B0FF", "#C0C0C0FF", "#787878FF", "#4B4B4BFF", "#000000FF")
 
-LL1 <- leaflet(dfRTx) %>%
+LL1 <- leaflet() %>%
   addTiles() %>%
   setView(lng = -106.485, lat = 31.763, zoom = 12) %>%
-  addCircleMarkers(data = dfRTx, lng = ~longitude, lat = ~latitude, 
+  addCircleMarkers(data = RT_stop_avg, lng = ~longitude, lat = ~latitude, 
                    radius = 5, 
-                   color = ~colors(9)[cut(avg_ons, breaks = jenks_breaks)], 
+                   color = ~colors[cut(avg_ons, breaks = jenks_breaks)], 
                    fillOpacity = 0.7,
                    popup = paste(
-                     "Route: ", dfRTx$RT, "<br>",
-                     "Stop: ", dfRTx$stop_desc, "<br>",
-                     "Average Onboarding: ", round(dfRTx$avg_ons, digits = 2))) %>%
+                     "Route: ", RT_stop_avg$RT, "<br>",
+                     "Stop: ", RT_stop_avg$TP, "<br>",
+                     "Average Onboarding: ", round(RT_stop_avg$avg_ons, digits = 2))) %>%
   addLegend("bottomright", 
             title = "Average Onboarding per stop & route", 
-            colors = colors(9), 
+            colors = colors, 
             labels = c(sprintf("%.2f - %.2f", jenks_breaks[1], jenks_breaks[2]), 
                        sprintf("%.2f - %.2f", jenks_breaks[2], jenks_breaks[3]), 
                        sprintf("%.2f - %.2f", jenks_breaks[3], jenks_breaks[4]), 
@@ -357,81 +511,18 @@ LL2
 
 Next, we analyzed census data at the tract level from the 2020 American Community Survey. We particularly focused on demographic and socioeconomic indicators that we predicted to be correlated to transit ridership demand.
 
-```{r ridership per census tract}
-
-ep_tx_tracts <- get_acs(
-  geography = "tract", 
-  variables = "B01001_001E",
-  county = "El Paso",
-  state = "TX", 
-  year = 2020,
-  geometry = TRUE,
-) 
-
-st_crs(ep_tx_tracts) <- st_crs(4269)
-st_crs(sum_by_stops) <- st_crs(4269)
-  
-
-ridership_by_tract <- st_join(ep_tx_tracts, sum_by_stops, join = st_intersects)
-
-riderhsip_by_tract <- ridership_by_tract %>%
-  group_by(NAME) %>%
-  summarize(ons = sum(total_ons), 
-            offs = sum(total_offs)) %>%
-  dplyr::f
-
-# create two ggplot objects, one for ons and one for offs
-p_ons <- ggplot() +
-  geom_sf(data = riderhsip_by_tract, aes(fill = ons), color="transparent") +
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1) +
-  labs(title = "Onboard Counts") +
-  mapTheme
-
-p_offs <- ggplot() +
-  geom_sf(data = riderhsip_by_tract, aes(fill = offs), color="transparent") +
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1) +
-  labs(title = "Offboard Counts") +
-  mapTheme
-
-# arrange the two plots side by side using facet_wrap
-gridExtra::grid.arrange(p_ons, p_offs, ncol = 2)
-
-```
-
-
 ```{r}
-acs_variable_list.2020 <- load_variables(2020,
-                                         "acs5",
-                                         cache = TRUE)
-
 censusvars <- c("B01001_001E", # ACS total Pop estimate
               "B25002_001E", # Estimate of total housing units
               "B25002_003E", # Number of vacant housing units
               "B19013_001E", # Median HH Income ($)
-              "B25075_001E", # House value
-              
-              "B01001I_001E", # Hispanic/Latino population
-              "B02001_002E", # White 
-              "B02001_003E", # Black 
-              "B02001_004E", # American Indian/Alaskan Native
-              "B02001_005E", # Asiana
-              "B02001_006E", # Native Hawaiian
-              "B02001_007E", # Other
-              "B02001_008E", # Two plus races
-              "B02001_009E", 
-              "B02001_010E", 
-              
-              
-              "B06009_002E", # Less than high school
-              "B06009_003E", # High school or equivalent
-              "B06009_004E", # Some college or associate's degree
-              "B06009_005E", # Bachelor's degree
-              "B06009_006E", # Graduate degree
-              
-              "B08014_001E", # Sex by workers by household vehicles available
+              "B02001_002E", # People describing themselves as "white alone"
+              "B06009_006E",
+              "B01001I_001E", # Hispanic or Latino 
+              "B08014_001E",
               "B09001_002E", # Population under 18
               "B10052_002E", # Disability
-
+              "B25075_001E", # House value
               "B08014_002E") # No vehicle available
 
 
@@ -485,11 +576,11 @@ medHHInc <-
           fill = "transparent")+
   scale_fill_paletteer_c("grDevices::Red-Yellow", -1,
                           name="$")+
-  # geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.4) +
-  # geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.4) +
-  # scale_color_manual(name = "Stop Ridership Data", 
-  #                    values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
-  #                    labels = c("Average Ons > 5", "Average Offs > 5")) +
+  geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.4) +
+  geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.4) +
+  scale_color_manual(name = "Stop Ridership Data", 
+                     values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
+                     labels = c("Average Ons > 5", "Average Offs > 5")) +
   labs(
     title = "Median household income",
     subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
@@ -725,6 +816,113 @@ ggplot()+
   mapTheme
 ```
 
+# Feature Engineering
+
+## National Walkability Index (2019)
+
+```{r nwi data, }
+blocks <- blocks(state = "TX", county = "El Paso") %>%
+  st_geometry(blocks)
+
+nwi <- read_csv(paste(data_folder, "/nwi2019.csv", sep = '')) %>%
+  dplyr::filter(CBSA_Name == "El Paso, TX") %>%
+  dplyr::select(c("OBJECTID",
+                 "GEOID10",
+                 "TRACTCE",
+                 "BLKGRPCE",
+                 "TotPop",
+                 "CountHU", # number of housing units
+                 "P_WrkAge", # percent working age pop. (18-64)
+                 "HH", # households
+                 "Pct_AO0", # % of HH owning 0 vehicles
+                 "Pct_AO1", # % of HH owning 1 vehicle
+                 "Pct_AO2p", # % of HH owning 2+ vehicles
+                 "R_PCTLOWWAGE", # % of low wage workers
+                 "D1C", # employment density
+                 "D2R_JOBPOP", # jobs to population balance
+                 "D2B_E8MIXA", # employment mix
+                 "D2A_EPHHM", # employment + household mix
+                 "D3B", # intersection density
+                 "D4A", # distance from population-weighted centroid to nearest transit stop
+                 "D5AR", # regional accessibility for access to jobs
+                 "D5BR", # destination accessibility via transit
+                 )) %>%
+
+nwi$GEOID <- paste0(substr(nwi$GEOID10, 1, 5), "0", sprintf("%05d", nwi$TRACTCE), nwi$BLKGRPCE)
+
+nwi_bg <- left_join(nwi, bg, by = "GEOID")
+
+nwi_bg <- st_as_sf(nwi_bg)
+
+nwi_bg %>%
+  rename(
+    totalPop = TotPop,
+    housingUnits = CountHU,
+    pctWorkingAge = P_WrkAge,
+    housingUnits = CountHU,
+    pct0Car = Pct_AO0,
+    pct1Car = Pct_AO1,
+    pct2Car = Pct_AO2p,
+    pctLowWage = R_PCTLOWWAGE,
+    employmentDensity = D1C,
+    jobsPopBalance = D2R_JOBPOP,
+    employmentMix = D2B_E8MIXA,
+    employmentHHMix = D2A_EPHHM,
+    intersectionDensity = D3B,
+    nearestTransit = D4A,
+    jobAccessibility = D5AR,
+    destinationAccessibility = D5BR
+  ) %>%
+  dplyr::select(-c("OBJECTID",
+                 "GEOID10",
+                 "TRACTCE",
+                 "BLKGRPCE",))
+
+ggplot(data = nwi_bg) +
+  geom_sf(aes(fill = Pct_AO0)) +
+  mapTheme
+
+
+```
+
+```{r ndi api}
+# Load the required packages
+library(tidycensus)
+library(httr)
+
+# Set the Walk Score API key
+walkscore_key <- "97c51210c4c9acfce3869b13a5af3f28"
+
+# Get the addresses for all census block groups in El Paso, TX
+bg <- get_acs(geography = "block group", 
+              variables = "B01003_001", 
+              year = 2019,
+              state = "TX", 
+              county = "El Paso", geometry=TRUE)
+
+nwi19 <- rbind(nwi, bg)
+```
+
+
+## Jobs Data
+
+## Open Street Map
+
+```{r osm amenities}
+bbox <- c(left = -106.6435, bottom = 31.6815, right = -106.1845, top = 31.9865)
+
+el_paso_amenities <- osmdata::osmdata_sf(
+  bbox = bbox,
+  type = "amenity"
+)
+
+# Print the first few rows of the resulting data
+head(el_paso_amenities$osm_points)
+
+```
+
+
+# Modeling
 
 # Bus Network and Maps
 
