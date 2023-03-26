@@ -1,0 +1,187 @@
+---
+title: "Latend Bus Ridership Demand Modelling of El Paso, Texas"
+author: "Charlie Huemmler, Yingxue Ou, Jack Rummler"
+date: "2023-03-26"
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+    code_folding: hide
+    pdf_document: default
+    theme: journal
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+  warning=FALSE,
+  message=FALSE,
+  results='hide')
+
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(lehdr)
+library(here)
+#devtools::install_github("jamgreen/lehdr")
+
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+
+census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
+data_folder <- file.path(
+  here() %>% 
+    dirname(), 'data')
+
+mapTheme <- theme(
+    text = element_text( color = "black"),
+    plot.title = element_text(size = 14,colour = "black"),
+    plot.subtitle=element_text(face="italic"),
+    plot.caption=element_text(hjust=0),
+    axis.ticks = element_blank(),
+    panel.background = element_blank(),axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=2)
+  ) 
+
+plotTheme <- theme(
+    text = element_text( color = "black"),
+    plot.title = element_text(size = 14,colour = "black"),
+    plot.subtitle=element_text(face="italic"),
+    plot.caption=element_text(hjust=0),
+    #axis.ticks = element_blank(),
+    panel.background = element_blank(),
+    #axis.title = element_blank(),
+    #axis.text = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=2)
+  ) 
+
+sf::sf_use_s2(FALSE)
+options(scipen=999)
+```
+
+
+```{r get el paso census data}
+censusvars <- c("B01001_001E", # ACS total Pop estimate
+              "B25002_001E", # Estimate of total housing units
+              "B25002_003E", # Number of vacant housing units
+              "B19013_001E", # Median HH Income ($)
+              "B02001_002E", # People describing themselves as "white alone"
+              "B06009_006E",
+              "B01001I_001E", # Hispanic or Latino 
+              "B08014_001E",
+              "B09001_002E", # Population under 18
+              "B10052_002E", # Disability
+              "B25075_001E", # House value
+              "B08014_002E") # No vehicle available
+
+
+elpaso <- get_acs(geography = "tract",
+                             year = 2020, 
+                             variables = censusvars, 
+                             geometry = T,
+                             state = "TX", 
+                             county = "El Paso", 
+                             output = "wide") 
+
+
+elpaso <- elpaso %>%
+  rename(
+    total_pop.2020 = B01001_001E,
+    total_HU.2020 = B25002_001E,
+    total_vacant.2020 = B25002_003E,
+    med_HH_Income.2020 = B19013_001E,
+    total_White.2020 = B02001_002E,
+    total_GradDeg.2020 = B06009_006E,
+    total_HL.2020 = B01001I_001E,
+    noV.2020 = B08014_002E,
+    under18.2020 = B09001_002E,
+    disAb.2020 = B10052_002E,
+    Value = B25075_001E
+  ) %>%
+    mutate(vacancyPct.2020 = total_vacant.2020/total_HU.2020,
+         pctWhite.2020 = total_White.2020/total_pop.2020,
+         pctHL.2020 = total_HL.2020/total_pop.2020,
+         pctNV.2020 = noV.2020/total_HU.2020*100,
+         pctUnder18.2020 = under18.2020/total_pop.2020,
+         pctDisAb.2020 = disAb.2020/total_pop.2020,
+         area_sqmile = st_area(geometry)/2590000,
+         pop_dense = as.numeric(total_pop.2020 / area_sqmile)
+         ) %>%
+  st_as_sf(crs = 4269) 
+```
+
+```{r make_hex_net}
+elpaso_outline <- elpaso %>% st_union() %>% sf::st_cast()
+
+hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F)  %>%  st_sf() 
+
+hex <- hex[elpaso,] %>%
+  mutate(uniqueID = rownames(.))
+
+```
+
+
+
+```{r target variable into net}
+data_folder <- file.path(here() %>% dirname(), 'data')
+
+riderstops_sf <- read_csv(paste(data_folder, "/riderstops1.csv", sep = '')) %>%
+  filter(!is.na(stop_lat)) %>%
+  st_as_sf(coords = c('stop_lon', 'stop_lat'), crs = 4269) 
+
+stop_riders_agg <- riderstops_sf %>% group_by(TP) %>% summarise(ridership = sum(Ons) + sum(Offs))
+
+
+ridership_net <- stop_riders_agg %>% 
+  dplyr::select(ridership) %>% 
+  aggregate(., hex, sum) %>%
+  mutate(ridership = replace_na(ridership, 0),
+         uniqueID = rownames(.))
+
+```
+
+
+
+```{r create census hex}
+
+#get lhodes work place data
+tx_work <- grab_lodes(state = "tx", year = 2019, lodes_type = "wac", job_type = "JT01", 
+                    segment = "S000", state_part = "main", agg_geo = "tract")
+
+#merge to census tracts data
+elpaso_work <- left_join(elpaso, tx_work, by = c('GEOID' = 'w_tract')) %>% st_sf()
+
+
+#add to hex
+census_hex <- hex %>% st_centroid() %>% st_join(elpaso_work, join=st_within) %>% 
+  st_drop_geometry() %>% 
+  full_join(., hex) %>% st_sf()
+```
+
+
+```{r make final hex}
+final_hex <- left_join(ridership_net, st_drop_geometry(census_hex), by = "uniqueID")
+
+plot(final_hex)
+
+
+```
+
+
+```{r}
+m1 <- lm(formula = ridership ~ med_HH_Income.2020 + pctWhite.2020 + pctUnder18.2020 + pop_dense,
+         data = final_hex)
+
+m1 %>% summary()
+
+```
+
+
