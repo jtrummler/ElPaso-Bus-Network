@@ -1,5 +1,5 @@
 ---
-title: "Latend Bus Ridership Demand Modelling of El Paso, Texas"
+title: "Latent Bus Ridership Demand Modelling of El Paso, Texas"
 author: "Charlie Huemmler, Yingxue Ou, Jack Rummler"
 date: "2023-03-26"
 output:
@@ -12,9 +12,6 @@ output:
     theme: journal
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 ```{r setup, warning=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
