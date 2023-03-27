@@ -24,6 +24,10 @@ library(tidyverse)
 library(tidycensus)
 library(lehdr)
 library(here)
+library(cowplot)
+library(paletteer)
+library(scales)
+library(ggpubr)
 #devtools::install_github("jamgreen/lehdr")
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
@@ -63,6 +67,7 @@ plotTheme <- theme(
 sf::sf_use_s2(FALSE)
 options(scipen=999)
 ```
+
 
 
 ```{r get el paso census data}
@@ -109,19 +114,47 @@ elpaso <- elpaso %>%
          pctNV.2020 = noV.2020/total_HU.2020*100,
          pctUnder18.2020 = under18.2020/total_pop.2020,
          pctDisAb.2020 = disAb.2020/total_pop.2020,
-         area_sqmile = st_area(geometry)/2590000,
-         pop_dense = as.numeric(total_pop.2020 / area_sqmile)
+         area_sqmile = st_area(geometry)/2590000
          ) %>%
   st_as_sf(crs = 4269) 
 ```
 
 ```{r make_hex_net}
-elpaso_outline <- elpaso %>% st_union() %>% sf::st_cast()
+busroutes <-  read_sf(paste(data_folder, "/transit_lines.geojson", sep = '')) %>% st_transform(crs = 4269)
 
-hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F)  %>%  st_sf() 
+roads <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = '')) %>% st_transform(crs = 4269)
 
-hex <- hex[elpaso,] %>%
+#ask alex about this map
+
+
+futureLU <- read_sf(paste(data_folder, "/FutureLandUse.shp", sep = '')) %>% st_transform(crs = 4269)  
+
+futureLU_crop <- futureLU %>% st_crop(y = st_bbox(busroutes))
+
+# ggplot()+
+#    geom_sf(data = futureLU, aes(fill = COMMENTS))+
+#    geom_sf(data = roads)+
+#    geom_sf(data = busroutes, color = 'red')
+ 
+
+
+excludeLU <- c("Fort Bliss Military","Fort Bliss Mixed Use (Airport)","Preserve","Industrial and/or Railyards","Remote","Military Reserve")
+
+
+exclude_area <-  futureLU_crop %>% filter(COMMENTS %in% excludeLU) %>% st_union()
+
+
+
+elpaso_outline <- elpaso %>% st_union() %>% st_sf() %>% st_crop(y = st_bbox(busroutes)) %>% st_difference(exclude_area)
+
+
+hex <- st_make_grid(elpaso_outline, cellsize = .0075, crs = 4269,  square = F) %>% st_sf() 
+
+hex <- hex[elpaso_outline,] %>%
   mutate(uniqueID = rownames(.))
+
+ggplot(hex)+
+  geom_sf()
 
 ```
 
@@ -151,23 +184,72 @@ ridership_net <- stop_riders_agg %>%
 
 #get lhodes work place data
 tx_work <- grab_lodes(state = "tx", year = 2019, lodes_type = "wac", job_type = "JT01", 
-                    segment = "S000", state_part = "main", agg_geo = "tract")
-
+                    segment = "S000", state_part = "main", agg_geo = "tract") %>% 
+  rename(total_jobs = C000,
+         age_29_or_younger = CA01,
+         age_30_to_54 = CA02,
+         age_55_or_older = CA03,
+         monthly_income_1250_or_less = CE01,
+         monthly_income_1251_to_3333 = CE02,
+         monthly_income_3334_or_more = CE03,
+         NAICS11 = CNS01,
+         NAICS21 = CNS02,
+         NAICS22 = CNS03,
+         NAICS23 = CNS04,
+         NAICS31_33 = CNS05,
+         NAICS42 = CNS06,
+         NAICS44_46 = CNS07,
+         NAICS48_49 = CNS08,
+         NAICS51 = CNS09,
+         NAICS52 = CNS10,
+         NAICS53 = CNS11,
+         NAICS54 = CNS12,
+         NAICS55 = CNS13,
+         NAICS56 = CNS14,
+         NAICS61 = CNS15,
+         NAICS62 = CNS16,
+         NAICS71 = CNS17,
+         NAICS72 = CNS18,
+         NAICS81 = CNS19,
+         NAICS92 = CNS20,
+         white_work = CR01,
+         black_work = CR02,
+         native_american_work = CR03,
+         asian_work = CR04,
+         pacific_work = CR05,
+         mixed_race_work = CR07,
+         not_hispanic_work = CT01,
+         hispanic_work = CT02,
+         male_work = CS01,
+         female_work = CS02) %>% select(-starts_with("C"))
 #merge to census tracts data
-elpaso_work <- left_join(elpaso, tx_work, by = c('GEOID' = 'w_tract')) %>% st_sf()
-
+elpaso_work <- left_join(elpaso, tx_work, by = c('GEOID' = 'w_tract')) %>% st_sf() %>%
+  mutate_at(colnames(tx_work)[4:length(colnames(tx_work))], funs(as.numeric(./area_sqmile)))
 
 #add to hex
-census_hex <- hex %>% st_centroid() %>% st_join(elpaso_work, join=st_within)
+census_hex <- hex %>% st_centroid() %>% st_join(elpaso_work, join=st_within) %>% 
+  st_drop_geometry() %>% 
+  full_join(., hex) %>% st_sf()
+
+
 ```
+
+```{r}
+#tring another way
+
+#hex_join <- st_intersection(hex, elpaso_work) %>% group_by(uniqueID) %>% 
+ # summarize()
+
+#ggplot(hex_join)+
+ # geom_sf()
+```
+
 
 ```{r walkabiity features}
 walkscore <- read_sf(paste(data_folder, "/nwi_bg.geojson", sep = ''))
+
 walk_hex <- hex %>% st_centroid() %>% st_join(walkscore, join=st_within)
 
-
-ggplot(walkscore)+
-  geom_sf()
 ```
 
 ```{r make final hex}
@@ -176,13 +258,44 @@ final_hex <- left_join(ridership_net, st_drop_geometry(census_hex), by = "unique
 
 ```
 
+```{r feature mapping and scatterplot}
 
-```{r}
-vars <-c(colnames(final_hex))
 
-input <- final_hex %>% select(vars)
 
-m1 <- lm(formula = ridership ~ med_HH_Income.2020 + pctWhite.2020 + pctUnder18.2020 + pop_dense,
+inde_var <- "total_jobs"
+
+
+
+scat <- final_hex %>% st_drop_geometry() %>% 
+  ggplot(aes(y = ridership, x = get(inde_var)))+
+  geom_point(alpha = .5)+
+  scale_x_continuous(labels = comma)+
+  scale_y_continuous(labels = comma)+
+  theme_bw()+
+  labs(title = paste("Hex Ridership vs",inde_var), y = 'Ridership', x = inde_var)+
+  stat_cor(method = "pearson")+
+  geom_smooth(method = 'lm', se = F, color = 'red', linetype= 'dashed')
+
+map <- final_hex %>%
+  ggplot()+
+  geom_sf(aes(fill = get(inde_var)), color =NA)+
+  paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
+  labs(fill = inde_var)+
+  theme(legend.position = 'right')+
+  mapTheme
+  
+plot_grid(scat, map, rel_widths = c(1,1.3))
+```
+
+```{r modeling}
+
+lhodes_vars <-c(colnames(tx_work)[5:length(colnames(tx_work))])
+census_vars <- c()
+walkscore_vars <- c()
+
+input <- final_hex %>% select(ridership, lhodes_vars) %>% st_drop_geometry()
+
+m1 <- lm(formula = ridership ~ .,
          data = input)
 
 m1 %>% summary()
