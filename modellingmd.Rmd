@@ -1,5 +1,5 @@
 ---
-title: "Latend Bus Ridership Demand Modelling of El Paso, Texas"
+title: "Latent Bus Ridership Demand Modelling of El Paso, Texas"
 author: "Charlie Huemmler, Yingxue Ou, Jack Rummler"
 date: "2023-03-26"
 output:
@@ -12,9 +12,6 @@ output:
     theme: journal
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 ```{r setup, warning=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
@@ -161,24 +158,32 @@ elpaso_work <- left_join(elpaso, tx_work, by = c('GEOID' = 'w_tract')) %>% st_sf
 
 
 #add to hex
-census_hex <- hex %>% st_centroid() %>% st_join(elpaso_work, join=st_within) %>% 
-  st_drop_geometry() %>% 
-  full_join(., hex) %>% st_sf()
+census_hex <- hex %>% st_centroid() %>% st_join(elpaso_work, join=st_within)
 ```
 
+```{r walkabiity features}
+walkscore <- read_sf(paste(data_folder, "/nwi_bg.geojson", sep = ''))
+walk_hex <- hex %>% st_centroid() %>% st_join(walkscore, join=st_within)
+
+
+ggplot(walkscore)+
+  geom_sf()
+```
 
 ```{r make final hex}
-final_hex <- left_join(ridership_net, st_drop_geometry(census_hex), by = "uniqueID")
-
-plot(final_hex)
-
+final_hex <- left_join(ridership_net, st_drop_geometry(census_hex), by = "uniqueID") %>% 
+  left_join(st_drop_geometry(walk_hex), by = "uniqueID") %>% replace(is.na(.), 0)
 
 ```
 
 
 ```{r}
+vars <-c(colnames(final_hex))
+
+input <- final_hex %>% select(vars)
+
 m1 <- lm(formula = ridership ~ med_HH_Income.2020 + pctWhite.2020 + pctUnder18.2020 + pop_dense,
-         data = final_hex)
+         data = input)
 
 m1 %>% summary()
 
