@@ -71,52 +71,70 @@ options(scipen=999)
 
 
 ```{r get el paso census data}
-censusvars <- c("B01001_001E", # ACS total Pop estimate
-              "B25002_001E", # Estimate of total housing units
-              "B25002_003E", # Number of vacant housing units
-              "B19013_001E", # Median HH Income ($)
-              "B02001_002E", # People describing themselves as "white alone"
-              "B06009_006E",
-              "B01001I_001E", # Hispanic or Latino 
-              "B08014_001E",
-              "B09001_002E", # Population under 18
-              "B10052_002E", # Disability
-              "B25075_001E", # House value
-              "B08014_002E") # No vehicle available
-
+censusvarsEP <- c(
+  "B01001_001E", # ACS total Pop estimate
+  "B01001I_001E", # Population - Hispanic or Latino 
+  "B02001_002E", # Population - White alone
+  "B02001_003E", # Population - Black or African American alone
+  "B02001_004E", # Population - American Indian and Alaska Native alone
+  "B02001_005E", # Population - Asian alone
+  "B02001_006E", # Population - Native Hawaiian and Other Pacific Islander alone
+  "B02001_007E", # Population - Some other race alone
+  "B02001_008E", # Population - Two or more races
+  "B19013_001E", # Median household income in the past 12 months (in 2019 inflation-adjusted dollars)
+  "B25001_001E", # Total housing units
+  "B25002_002E", # Occupancy status - Occupied housing units
+  "B25024_001E", # Gross rent as a percentage of household income in the past 12 months
+  "B25044_001E", # Vehicles available
+  "B28005_001E", # Means of transportation to work by age
+  "B28010_001E", # Commuting time to work (in minutes)
+  "B10052_002E", # Disability
+  "B06009_002E", # Less than high school
+  "B06009_003E", # High School
+  "B06009_004E", # Associates or equivalent
+  "B06009_005E", # Bachelors
+  "B06009_006E" # Graduate or prof. degree
+)
 
 elpaso <- get_acs(geography = "tract",
                              year = 2020, 
-                             variables = censusvars, 
+                             variables = censusvarsEP, 
                              geometry = T,
                              state = "TX", 
                              county = "El Paso", 
                              output = "wide") 
 
+#vec to not divide by sqkm
+dontdiv<- c("GEOID","NAME","medHHInc","grossRentPerInc","commuteToWork","geometry","area_sqmile")
 
 elpaso <- elpaso %>%
-  rename(
-    total_pop.2020 = B01001_001E,
-    total_HU.2020 = B25002_001E,
-    total_vacant.2020 = B25002_003E,
-    med_HH_Income.2020 = B19013_001E,
-    total_White.2020 = B02001_002E,
-    total_GradDeg.2020 = B06009_006E,
-    total_HL.2020 = B01001I_001E,
-    noV.2020 = B08014_002E,
-    under18.2020 = B09001_002E,
-    disAb.2020 = B10052_002E,
-    Value = B25075_001E
-  ) %>%
-    mutate(vacancyPct.2020 = total_vacant.2020/total_HU.2020,
-         pctWhite.2020 = total_White.2020/total_pop.2020,
-         pctHL.2020 = total_HL.2020/total_pop.2020,
-         pctNV.2020 = noV.2020/total_HU.2020*100,
-         pctUnder18.2020 = under18.2020/total_pop.2020,
-         pctDisAb.2020 = disAb.2020/total_pop.2020,
-         area_sqmile = st_area(geometry)/2590000
-         ) %>%
-  st_as_sf(crs = 4269) 
+rename(
+  totalPop = B01001_001E, 
+  hlPop = B01001I_001E, 
+  whitePop = B02001_002E, 
+  blackPop = B02001_003E,
+  aiPop = B02001_004E,
+  asianPop = B02001_005E,
+  nhPop = B02001_006E,
+  otherRacePop = B02001_007E,
+  twoPlusRacePop = B02001_008E,
+  medHHInc = B19013_001E,
+  totalHU = B25001_001E, 
+  occupiedHU = B25002_002E, 
+  grossRentPerInc = B25024_001E, 
+  transByAge = B28005_001E,
+  commuteToWork = B28010_001E,
+  lessThanHS = B06009_002E,
+  highSchool = B06009_003E,
+  associatesDeg = B06009_004E,
+  bachelorDeg = B06009_005E,
+  professionalDeg = B06009_006E,
+  disability = B10052_002E) %>%
+    mutate(area_sqmile = st_area(geometry)/2590000
+         ) %>%  st_as_sf(crs = 4269) %>%
+  mutate_at(vars(-dontdiv), funs(as.numeric(./area_sqmile)))
+
+
 ```
 
 ```{r make_hex_net}
@@ -148,7 +166,7 @@ exclude_area <-  futureLU_crop %>% filter(COMMENTS %in% excludeLU) %>% st_union(
 elpaso_outline <- elpaso %>% st_union() %>% st_sf() %>% st_crop(y = st_bbox(busroutes)) %>% st_difference(exclude_area)
 
 
-hex <- st_make_grid(elpaso_outline, cellsize = .0075, crs = 4269,  square = F) %>% st_sf() 
+hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F) %>% st_sf() 
 
 hex <- hex[elpaso_outline,] %>%
   mutate(uniqueID = rownames(.))
@@ -181,6 +199,8 @@ ridership_net <- stop_riders_agg %>%
 
 
 ```{r create census hex}
+
+#https://lehd.ces.census.gov/data/lodes/LODES7/LODESTechDoc7.5.pdf
 
 #get lhodes work place data
 tx_work <- grab_lodes(state = "tx", year = 2019, lodes_type = "wac", job_type = "JT01", 
@@ -246,7 +266,9 @@ census_hex <- hex %>% st_centroid() %>% st_join(elpaso_work, join=st_within) %>%
 
 
 ```{r walkabiity features}
-walkscore <- read_sf(paste(data_folder, "/nwi_bg.geojson", sep = ''))
+walkscore <- read_sf(paste(data_folder, "/nwi_bg.geojson", sep = '')) %>% rename(
+  totalPop_walk = totalPop
+)
 
 walk_hex <- hex %>% st_centroid() %>% st_join(walkscore, join=st_within)
 
@@ -290,10 +312,10 @@ plot_grid(scat, map, rel_widths = c(1,1.3))
 ```{r modeling}
 
 lhodes_vars <-c(colnames(tx_work)[5:length(colnames(tx_work))])
-census_vars <- c()
+census_vars <- c(colnames(elpaso)[!colnames(elpaso) %in% c("GEOID","NAME")] )
 walkscore_vars <- c()
 
-input <- final_hex %>% select(ridership, lhodes_vars) %>% st_drop_geometry()
+input <- final_hex %>% select(ridership, lhodes_vars, census_vars, walkscore_vars) %>% st_drop_geometry()
 
 m1 <- lm(formula = ridership ~ .,
          data = input)
