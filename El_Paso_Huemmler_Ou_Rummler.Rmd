@@ -54,19 +54,16 @@ library(ggtext)
 library(gapminder)
 library(ggplot2)
 library(osmdata)
-install.packages("walkscoreapi")
-library(walkscoreapi)
-
-
+#install.packages("mapview")
+library(mapview)
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
 census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
+
 data_folder <- file.path(
   here() %>% 
     dirname(), 'data')
-
-data_folder <- "C:/Users/jtrum/Desktop/MUSA8010/data"
 
 mapTheme <- theme(
     text = element_text( color = "black"),
@@ -95,25 +92,63 @@ plotTheme <- theme(
     panel.border = element_rect(colour = "black", fill=NA, size=2)
   ) 
 
+palette7 <- c("#B8860B", "#2F4F4F", "#8B0000", "#FFD700", "#556B2F", "#ADD8E6", "#FF69B4")
+
+
 sf::sf_use_s2(FALSE)
 options(scipen=999)
 ```
 
-# Introduction and Use Case
+# Introduction
 
-Sun Metro is the transportation provider in the city of El Paso, Texas. Sun Metro has made several expansions in the past decade, particularly adding four bus rapid transit (BRT) lines, adding the streetcar network, and a new transit center. With many transit agencies in the last decade, there has been a yearly decrease in bus ridership, with a sharp decrease at the start of the COVID-19 pandemic. Now, Sun Metro experiences about 63% of pre-pandemic ridership numbers, but the agency is looking to explore the implications of new bus transit services.
+This project was created by Charlie Huemmler, Yingxue Ou, and Jack Rummler as part of the University of Pennsylvania Master of Urban Spatial Analytics practicum. We would like to thank our client, Alex Hoffman, AICP, of the El Paso Capital Improvements Department for his continual knowledge, eagerness to help, and enthusiasm for this project. We also would like to thank Professors Matthew Harris and Michael Fichman for their invaluable mentorship throughout this project.
 
-The four BRIO lines currently have the greatest ridership and frequency, accounting for 40% of current ridership. Local bus routes and BRIO lines account for 65% of system ridership. As BRIO stops are spaced out every 3/4 to 1 mile, the agency is seeking ways to connect local bus transit routes to BRIO lines, accommodating issues associated with the first-mile/last-mile problem. Within new bus transit alternatives, Sun Metro wants to maximize both financial profitability of routes and equity/accessibility concerns.
+## El Paso Context
 
-Our client wishes to understand the ramifications of bus transit alternatives on the existing Sun Metro network based on current ridership counts and demographic/built environment indicators. We are developing a proof-of-concept, unbiased evaluation framework for Sun Metro transit planners to maximize the social equity and financial profitability outcomes of alternative bus route scenarios.
+Sun Metro is the transportation provider in the city of El Paso, Texas. Sun Metro has made several expansions in the past decade, most notably adding four bus rapid transit (BRT) lines, adding the streetcar network, and a new transit center. With many transit agencies in the last decade, there has been a yearly decrease in bus ridership, with a sharp decrease at the start of the COVID-19 pandemic. Now, Sun Metro experiences about 63% of pre-pandemic ridership numbers, but the agency is looking to explore the implications of new bus transit services.
+
+El Paso is the sixth-largest city in Texas located at the far western tip of the state, just immediately north of Ciudad Juárez. The city is bounded by the Rio Grande River to the south, the Franklin Mountain Range to the north, and Fort Bliss Military Base to the northeast. The context map below shows the geographical constraints where the Franklin Mountains are represented in light green, Fort Bliss Military Base in dark green, and the Rio Grande River in light blue, overlain on top of population density of the city at a census tract level. As we can see, downtown El Paso is notched in between the mountains and river, with heavy sprawl toward the north and east.
+
+[context_map.png]("C:/Users/jtrum/pennmusa/MUSA8010/repository/context_map.png")
+
+The four BRIO lines currently have the greatest ridership and frequency, accounting for 40% of current ridership. Local bus routes and BRIO lines account for 65% of system ridership. BRIO stops are spaced out every 3/4 to 1 mile, thus the agency is seeking ways to connect local bus transit routes to BRIO lines, accommodating issues associated with the first-mile/last-mile problem. Within new bus transit alternatives, Sun Metro wants to maximize both the revenue of routes as well as the equity and accessibility of bus transit options for El Paso residents.
+
+## Use Case
+
+Our client wishes to understand the ramifications of bus transit alternatives on the existing Sun Metro network based on current ridership counts and demographic variables, built environment characteristics, and spatial effects. We are developing a proof-of-concept, unbiased evaluation framework for Sun Metro transit planners to maximize the social equity and financial profitability outcomes of alternative bus route scenarios.
+
+We are building a predictive model of latent bus transit demand. Within our model, we bake in features related to socio-economic spatial characteristics, built environment features, and spatial lags that affect accessibility to transit. By using features related to system accessibility, we bring an equity approach to the model.
 
 # Data Gathering & Analysis
 
-Our client provided us with ridership data for the year 2022. Data was collected via sensors on a daily basis, recording number of on-boards and off-boards per stop and route. About 85% of buses were supplied with the sensors, thus the sensors had to be rotated to get the most accurate measures. We were also provided Replica data to analyze origin and destination data, aggregated at the census tract level. We gathered data from the American Community Survey and Open Data El Paso to integrate as community demographic and built environment indicators.
+## Current Bus Network
+
+We utilized road centerline data and bus route data obtained from El Paso's Open Data portal to understand the overall transit system's network. The current network is visually represented below, where roads were depicted in black and the bus network was overlain in orange. We can see that the network coverage extended significantly towards areas surrounding downtown El Paso. However, several neighborhoods located in the eastern part of the city remain unserved by the current transit system. This highlights a potential gap in the transit service coverage of the city and underscores the need for equity considerations in ensuring any El Paso resident has access to transit.
+
+```{r current bus network, warning=FALSE, message=FALSE, results=FALSE}
+bus_routes <- read_sf(paste(data_folder, "/BusRoutes.geojson", sep = ''))
+
+ggplot()+
+  geom_sf(data=road_centerlines, 
+          alpha=0.1, 
+          color="black", 
+          size=1)+
+  geom_sf(data=bus_routes,
+          alpha=0.9, 
+          color="#C96A52FF", 
+          size=1)+
+  labs(title="SunMetro Bus Network",
+       caption="Data: Open Data El Paso")+
+  mapTheme
+```
 
 ## Ridership Data (2022)
 
-```{r cleaning ridership data}
+Our client provided us with ridership data for the year 2022. Data was collected via sensors on a daily basis, recording number of on-boards and off-boards per stop and route. About 85% of buses were supplied with the sensors, thus the sensors had to be rotated to get the most accurate measures. 
+
+We were also provided Replica data to analyze origin and destination data, aggregated at the census tract level. We gathered data from the American Community Survey and Open Data El Paso to integrate as community demographic and built environment indicators.
+
+```{r cleaning ridership data, warning=FALSE, message=FALSE, results=FALSE}
 ridership <- read.csv(paste(data_folder, "/ridership.csv", sep = ''))
 
 ridership$Date <- ridership$Date %>% 
@@ -210,82 +245,86 @@ road_centerlines <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = ''))
 RT_stop_avg <- df %>%
   group_by(RT, TP, longitude, latitude) %>%
   summarize(avg_ons = mean(Ons), 
-            avg_offs = mean(Offs)) %>%
-   mutate(
-    type = case_when(
-      RT == 2 ~ "Local",
-      RT == 7 ~ "Local",
-      RT == 10 ~ "Local",
-      RT == 14 ~ "Local",
-      RT == 15 ~ "Local",
-      RT == 24 ~ "Local",
-      RT == 25 ~ "Local",
-      RT == 32 ~ "Local",
-      RT == 33 ~ "Local",
-      RT == 34 ~ "Local",
-      RT == 35 ~ "Local",
-      RT == 36 ~ "Local",
-      RT == 37 ~ "Local",
-      RT == 50 ~ "Local",
-      RT == 51 ~ "Local",
-      RT == 52 ~ "Local",
-      RT == 53 ~ "Local",
-      RT == 54 ~ "Local",
-      RT == 58 ~ "Local",
-      RT == 61 ~ "Local",
-      RT == 62 ~ "Local",
-      RT == 63 ~ "Local",
-      RT == 64 ~ "Local",
-      RT == 65 ~ "Local",
-      RT == 66 ~ "Local",
-      RT == 67 ~ "Local",
-      RT == 68 ~ "Local",
-      RT == 69 ~ "Local",
-      RT == 72 ~ "Local",
-      RT == 74 ~ "Local",
-      RT == 86 ~ "Local",
-      RT == 4 ~ "Circulator",
-      RT == 8 ~ "Circulator",
-      RT == 5 ~ "Express",
-      RT == 6 ~ "Express",
-      RT == 26 ~ "Express",
-      RT == 59 ~ "Express",
-      RT == 76 ~ "Express",
-      RT == 11 ~ "Feeder",
-      RT == 12 ~ "Feeder",
-      RT == 13 ~ "Feeder",
-      RT == 16 ~ "Feeder",
-      RT == 19 ~ "Feeder",
-      RT == 43 ~ "Feeder",
-      RT == 44 ~ "Feeder",
-      RT == 46 ~ "Feeder",
-      RT == 56 ~ "Feeder",
-      RT == 60 ~ "Feeder",
-      RT == 84 ~ "Feeder",
-      RT == 89 ~ "Feeder",
-      RT == 205 ~ "BRIO",
-      RT == 206 ~ "BRIO",
-      RT == 207 ~ "BRIO",
-      RT == 208 ~ "BRIO",
-      RT == 17 ~ "Other",
-      RT == 20 ~ "Other",
-      RT == 21 ~ "Other",
-      RT == 41 ~ "Other",
-      RT == 82 ~ "Other",
-      RT == 87 ~ "Other",
-      RT == 500 ~ "Streetcar"
-    )
-  )
+            avg_offs = mean(Offs))
 
-RT_stop_avg_5on <- RT_stop_avg[RT_stop_avg$avg_ons > 5, ]
-RT_stop_avg_5off <- RT_stop_avg[RT_stop_avg$avg_offs > 5, ]
+# RT_stop_avg <- RT_stop_avg %>%
+#   mutate(
+#     type = case_when(
+#       RT == 2 ~ "Local",
+#       RT == 7 ~ "Local",
+#       RT == 10 ~ "Local",
+#       RT == 14 ~ "Local",
+#       RT == 15 ~ "Local",
+#       RT == 24 ~ "Local",
+#       RT == 25 ~ "Local",
+#       RT == 32 ~ "Local",
+#       RT == 33 ~ "Local",
+#       RT == 34 ~ "Local",
+#       RT == 35 ~ "Local",
+#       RT == 36 ~ "Local",
+#       RT == 37 ~ "Local",
+#       RT == 50 ~ "Local",
+#       RT == 51 ~ "Local",
+#       RT == 52 ~ "Local",
+#       RT == 53 ~ "Local",
+#       RT == 54 ~ "Local",
+#       RT == 58 ~ "Local",
+#       RT == 61 ~ "Local",
+#       RT == 62 ~ "Local",
+#       RT == 63 ~ "Local",
+#       RT == 64 ~ "Local",
+#       RT == 65 ~ "Local",
+#       RT == 66 ~ "Local",
+#       RT == 67 ~ "Local",
+#       RT == 68 ~ "Local",
+#       RT == 69 ~ "Local",
+#       RT == 72 ~ "Local",
+#       RT == 74 ~ "Local",
+#       RT == 86 ~ "Local",
+#       RT == 4 ~ "Circulator",
+#       RT == 8 ~ "Circulator",
+#       RT == 5 ~ "Express",
+#       RT == 6 ~ "Express",
+#       RT == 26 ~ "Express",
+#       RT == 59 ~ "Express",
+#       RT == 76 ~ "Express",
+#       RT == 11 ~ "Feeder",
+#       RT == 12 ~ "Feeder",
+#       RT == 13 ~ "Feeder",
+#       RT == 16 ~ "Feeder",
+#       RT == 19 ~ "Feeder",
+#       RT == 43 ~ "Feeder",
+#       RT == 44 ~ "Feeder",
+#       RT == 46 ~ "Feeder",
+#       RT == 56 ~ "Feeder",
+#       RT == 60 ~ "Feeder",
+#       RT == 84 ~ "Feeder",
+#       RT == 89 ~ "Feeder",
+#       RT == 205 ~ "BRIO",
+#       RT == 206 ~ "BRIO",
+#       RT == 207 ~ "BRIO",
+#       RT == 208 ~ "BRIO",
+#       RT == 17 ~ "Other",
+#       RT == 20 ~ "Other",
+#       RT == 21 ~ "Other",
+#       RT == 41 ~ "Other",
+#       RT == 82 ~ "Other",
+#       RT == 87 ~ "Other",
+#       RT == 500 ~ "Streetcar"
+#     )
+#   )
+```
 
+We can see from the bar chart that BRIO routes are predominantly the most popular type of transit. Because of the fixed nature of BRIO routes, and political implications of bus transit design, we will primarily focus on local routes as part of our analysis. While some local routes experience relatively high ridership, we see total ridership peter out, with opportunity to increase ridership to underperforming routes.
+
+```{r route summary, warning = FALSE, message = FALSE, results = FALSE}
 RT_avg_sum <- df %>%
   group_by(RT) %>%
   summarize(avg_ons = mean(Ons), 
              avg_offs = mean(Offs),
              total_ons = sum(Ons),
              total_offs = sum(Offs)) %>%
+  mutate(total_ridership = total_ons + total_offs) %>%
   mutate(
     type = case_when(
       RT == 2 ~ "Local",
@@ -351,72 +390,53 @@ RT_avg_sum <- df %>%
       RT == 500 ~ "Streetcar"
     )
   )
-
 RT_avg_sum_st <- st_drop_geometry(RT_avg_sum)
 
 transit_lines <- st_read(paste(data_folder, "/transit_lines.geojson", sep = ''))
 merged <- merge(transit_lines, RT_avg_sum_st, by.x = "route_short_name", by.y = "RT")
+
+RT_avg_sum_st <- RT_avg_sum_st[order(-RT_avg_sum_st$total_ridership),]
+
+ggplot(RT_avg_sum_st, aes(y = total_ridership, x = reorder(factor(RT), -total_ridership), fill = type)) +
+  geom_bar(stat = "identity") +
+  xlab("Total Ridership") +
+  ylab("Route") +
+  scale_fill_manual(values = palette7, name="Type of Bus", expand=c(0.2, 0)) +
+  labs(title="Total Ridership by Route and Type",
+       caption="Data: El Paso Capital Improvements Department, 2022")+
+  plotTheme+
+  theme(axis.text.x = element_text(angle=90))
 ```
 
-```{r ridership line type,  warning = FALSE, message = FALSE, results=FALSE}
-ggplot(RT_avg_sum_st,
-       aes(x=total_ons,
-           y=total_offs,
-           color=type,
-           alpha=0.4))+
-  geom_point(size=5)+
-  labs(title="Total onboarding and offboarding per route",
-       subtitle="Color indicates type of transit")+
+As the scatter plot indicates, there is a strong correlation between average on-board and off-board frequency. This indicates that in bus transit trips, the average rider may exhibit round-trip behavior, boarding the bus at point A to travel to point B and then returning to point A without any intermediate stops.
+
+```{r scatterplot1, warning=FALSE, message=FALSE, results=FALSE}
+RT_stop_avg_st <- st_drop_geometry(RT_stop_avg)
+
+ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
+  geom_point() +
+  labs(x = "Average on-boarding", 
+       y = "Average off-boarding", 
+       title = "Scatterplot of on-boarding and off-boarding", 
+       subtitle="Average values grouped by route and stop information",
+       caption="Data: El Paso Capital Improvements Department, 2022")+
+  geom_smooth(method = lm, se=FALSE, colour = "#C96A52FF", size=1, )+
+  geom_abline(intercept=0, slope=1, color="#C96A52FF", alpha=0.3, size=1, style='dashed')+
   plotTheme
-  
 ```
 
-
-```{r}
-RT_stop_avg_st <- RT_stop_avg %>%
-  select(-geometry)
-```
-
-```{r}
-
-g <- ggplot()+
-  geom_sf(data = briolines %>% select(-route_long_name), size = 1.5, aes(color = route_id))+
-
-  geom_sf(data = notbrio %>% select(-route_long_name), alpha = .75, color = 'grey')+
-  geom_sf(data = notbrio, aes(group = route_long_name), color = 'red')+
-  mapTheme+
-  scale_color_manual(values = c('#B0C72C','#660066','#00A8E7'))+
-  labs(title = 'Sun Metro Local Bus Network',
-       subtitle = '{closest_state}')+
-  theme(legend.position = 'none')+
-  transition_states(route_long_name)+
-  exit_fade()
-
-animate(g, duration = 15, fps = 10, bg = 'black')
-
-anim_save('citybusses.gif', g, path = "C:/Users/cchue/Documents/Penn MUSA/Spring/Practicum",  duration = 15, fps = 10, bg = 'black')
-    
-```
-
-```{r total rides per route, warning = FALSE, message = FALSE, results=FALSE}
-ggplot()+
-  geom_sf(data=road_centerlines, alpha=0.1, color="black", size=1)+
-  geom_sf(data=merged,
-          aes(color=total_ons),
-          size=1)+
-  scale_color_paletteer_c("grDevices::Red-Yellow", -1,
-                          name="Sum")+
-  labs(title="Total Onboards per route (2022)")+
-  mapTheme
-```
 
 ```{r total offboards per route, warning = FALSE, message = FALSE, results=FALSE}
 ggplot()+
-  geom_sf(data=road_centerlines, alpha=0.1, color="black", size=1)+
+  geom_sf(data=road_centerlines, 
+          alpha=0.1, 
+          color="black", 
+          size=1)+
   geom_sf(data=merged,
           aes(color=total_offs),
           size=1)+
-  scale_color_paletteer_c("grDevices::Red-Yellow", -1,
+  scale_color_paletteer_c("grDevices::Red-Yellow", 
+                          -1,
                           name="Sum")+
   labs(title="Total Offboards per route (2022)")+
   mapTheme
@@ -424,55 +444,53 @@ ggplot()+
 
 Highest onboarding and offboarding ridership is among BRIO lines. There seems to be a spatial pattern where lines that go further out into the suburbs experience less overall ridership.
 
-### Correlations between on-boarding and off-boarding
+## Leaflet Maps
 
-```{r scatterplot1, warning = FALSE, message = FALSE, results=FALSE}
-ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
-  geom_point() +
-  labs(x = "Average on-boarding", 
-       y = "Average off-boarding", 
-       title = "Scatterplot of on-boarding and off-boarding", 
-       subtitle="Average values grouped by route and stop information")+
-  geom_smooth(method = lm, se=FALSE, colour = "#C96A52FF", size=1, )+
-  geom_abline(intercept=0, slope=1, color="#C96A52FF", alpha=0.3, size=1, style='dashed')+
-  plotTheme
-```
-
-As the scatter plot indicates, there is a strong correlation between average on-board and off-board frequency. This indicates that in bus transit trips, the average rider may exhibit round-trip behavior, boarding the bus at point A to travel to point B and then returning to point A without any intermediate stops.
-
-### Leaflet Maps - Average ridership
+The leaflet maps below are interactive to understand spatial distribution of current ridership patterns at a route and stop level.
 
 ```{r leaflet 1, warning = FALSE, message = FALSE, results=FALSE}
 jenks_breaks <- classIntervals(RT_stop_avg$avg_ons, n = 8, style = "jenks")$brks
 
 colors <- c("#7D0112FF", "#9A4221FF", "#BF7B42FF", "#E0BA79FF", "#F0E4B0FF", "#C0C0C0FF", "#787878FF", "#4B4B4BFF", "#000000FF")
 
-LL1 <- leaflet() %>%
-  addTiles() %>%
-  setView(lng = -106.485, lat = 31.763, zoom = 12) %>%
-  addCircleMarkers(data = RT_stop_avg, lng = ~longitude, lat = ~latitude, 
-                   radius = 5, 
-                   color = ~colors[cut(avg_ons, breaks = jenks_breaks)], 
-                   fillOpacity = 0.7,
-                   popup = paste(
-                     "Route: ", RT_stop_avg$RT, "<br>",
-                     "Stop: ", RT_stop_avg$TP, "<br>",
-                     "Average Onboarding: ", round(RT_stop_avg$avg_ons, digits = 2))) %>%
-  addLegend("bottomright", 
-            title = "Average Onboarding per stop & route", 
-            colors = colors, 
-            labels = c(sprintf("%.2f - %.2f", jenks_breaks[1], jenks_breaks[2]), 
-                       sprintf("%.2f - %.2f", jenks_breaks[2], jenks_breaks[3]), 
-                       sprintf("%.2f - %.2f", jenks_breaks[3], jenks_breaks[4]), 
-                       sprintf("%.2f - %.2f", jenks_breaks[4], jenks_breaks[5]), 
-                       sprintf("%.2f - %.2f", jenks_breaks[5], jenks_breaks[6]), 
-                       sprintf("%.2f - %.2f", jenks_breaks[6], jenks_breaks[7]), 
-                       sprintf("%.2f - %.2f", jenks_breaks[7], jenks_breaks[8]), 
-                       sprintf("%.2f - %.2f", jenks_breaks[8], jenks_breaks[9]), 
-                       sprintf(">%0.2f", jenks_breaks[9])),
-            opacity = 1) 
+# LL1 <- leaflet() %>%
+#   addTiles() %>%
+#   setView(lng = -106.485, lat = 31.763, zoom = 12) %>%
+#   addCircleMarkers(data = RT_stop_avg, lng = ~longitude, lat = ~latitude, 
+#                    radius = 5, 
+#                    color = ~colors[cut(avg_ons, breaks = jenks_breaks)], 
+#                    fillOpacity = 0.7,
+#                    popup = paste(
+#                      "Route: ", RT_stop_avg$RT, "<br>",
+#                      "Stop: ", RT_stop_avg$TP, "<br>",
+#                      "Average Onboarding: ", round(RT_stop_avg$avg_ons, digits = 2))) %>%
+#   addLegend("bottomright", 
+#             title = "Average Onboarding per stop & route", 
+#             colors = colors, 
+#             labels = c(sprintf("%.2f - %.2f", jenks_breaks[1], jenks_breaks[2]), 
+#                        sprintf("%.2f - %.2f", jenks_breaks[2], jenks_breaks[3]), 
+#                        sprintf("%.2f - %.2f", jenks_breaks[3], jenks_breaks[4]), 
+#                        sprintf("%.2f - %.2f", jenks_breaks[4], jenks_breaks[5]), 
+#                        sprintf("%.2f - %.2f", jenks_breaks[5], jenks_breaks[6]), 
+#                        sprintf("%.2f - %.2f", jenks_breaks[6], jenks_breaks[7]), 
+#                        sprintf("%.2f - %.2f", jenks_breaks[7], jenks_breaks[8]), 
+#                        sprintf("%.2f - %.2f", jenks_breaks[8], jenks_breaks[9]), 
+#                        sprintf(">%0.2f", jenks_breaks[9])),
+#             opacity = 1) 
+# 
+# mapview(map=LL1, 
+#         zcol="avg_ons", 
+#         fill = c("#7D0112FF", "#9A4221FF", "#BF7B42FF", "#E0BA79FF", "#F0E4B0FF", "#C0C0C0FF", "#787878FF", "#4B4B4BFF", "#000000FF"), 
+#         popup= list(Route = RT_stop_avg$RT,
+#                     Stop = RT_stop_avg$TP,
+#                     Average_Onboarding = round(RT_stop_avg$avg_ons, digits = 2)), 
+#         layer.name = "Average Onboarding")
 
-LL1
+mapview(RT_stop_avg, 
+        zcol = "avg_ons",
+        col.regions = c("#7D0112FF", "#9A4221FF", "#BF7B42FF", "#E0BA79FF", "#F0E4B0FF"),
+        layer.name = "Average Onboarding", 
+        popup = list(Route = RT_stop_avg$RT, Stop = RT_stop_avg$TP, Avg_Ons = round(RT_stop_avg$avg_ons, digits = 2)))
 ```
 
 ```{r leaflet2, warning = FALSE, message = FALSE, results=FALSE}
@@ -507,63 +525,88 @@ LL2
 
 [LL2]("C:/Users/jtrum/pennmusa/MUSA8010/repository/ElPaso-Bus-Network/LL1.html")
 
-## Census Data
+# Feature Engineering
+
+## Census Data (American Community Survey 2020)
 
 Next, we analyzed census data at the tract level from the 2020 American Community Survey. We particularly focused on demographic and socioeconomic indicators that we predicted to be correlated to transit ridership demand.
 
-```{r}
-censusvars <- c("B01001_001E", # ACS total Pop estimate
-              "B25002_001E", # Estimate of total housing units
-              "B25002_003E", # Number of vacant housing units
-              "B19013_001E", # Median HH Income ($)
-              "B02001_002E", # People describing themselves as "white alone"
-              "B06009_006E",
-              "B01001I_001E", # Hispanic or Latino 
-              "B08014_001E",
-              "B09001_002E", # Population under 18
-              "B10052_002E", # Disability
-              "B25075_001E", # House value
-              "B08014_002E") # No vehicle available
+```{r census vars, warning=FALSE, message=FALSE, results=FALSE}
+acs2020vars <- load_variables(2020, "acs5", cache = TRUE)
 
+censusvarsEP <- c(
+  "B01001_001E", # ACS total Pop estimate
+  "B01001I_001E", # Population - Hispanic or Latino 
+  "B02001_002E", # Population - White alone
+  "B02001_003E", # Population - Black or African American alone
+  "B02001_004E", # Population - American Indian and Alaska Native alone
+  "B02001_005E", # Population - Asian alone
+  "B02001_006E", # Population - Native Hawaiian and Other Pacific Islander alone
+  "B02001_007E", # Population - Some other race alone
+  "B02001_008E", # Population - Two or more races
+  "B19013_001E", # Median household income in the past 12 months (in 2019 inflation-adjusted dollars)
+  "B25001_001E", # Total housing units
+  "B25002_002E", # Occupancy status - Occupied housing units
+  "B25024_001E", # Gross rent as a percentage of household income in the past 12 months
+  "B25044_001E", # Vehicles available
+  "B28005_001E", # Means of transportation to work by age
+  "B28010_001E", # Commuting time to work (in minutes)
+  "B10052_002E", # Disability
+  "B06009_002E", # Less than high school
+  "B06009_003E", # High School
+  "B06009_004E", # Associates or equivalent
+  "B06009_005E", # Bachelors
+  "B06009_006E" # Graduate or prof. degree
+)
 
 elpaso <- get_acs(geography = "tract",
                              year = 2020, 
-                             variables = censusvars, 
+                             variables = censusvarsEP, 
                              geometry = T,
                              state = "TX", 
                              county = "El Paso", 
                              output = "wide") 
 
-
 elpaso <- elpaso %>%
-  rename(
-    total_pop.2020 = B01001_001E,
-    total_HU.2020 = B25002_001E,
-    total_vacant.2020 = B25002_003E,
-    med_HH_Income.2020 = B19013_001E,
-    total_White.2020 = B02001_002E,
-    total_GradDeg.2020 = B06009_006E,
-    total_HL.2020 = B01001I_001E,
-    noV.2020 = B08014_002E,
-    under18.2020 = B09001_002E,
-    disAb.2020 = B10052_002E,
-    Value = B25075_001E
+rename(
+  totalPop = B01001_001E, 
+  hlPop = B01001I_001E, 
+  whitePop = B02001_002E, 
+  blackPop = B02001_003E,
+  aiPop = B02001_004E,
+  asianPop = B02001_005E,
+  nhPop = B02001_006E,
+  otherRacePop = B02001_007E,
+  twoPlusRacePop = B02001_008E,
+  medHHInc = B19013_001E,
+  totalHU = B25001_001E, 
+  occupiedHU = B25002_002E, 
+  grossRentPerInc = B25024_001E, 
+  transByAge = B28005_001E,
+  commuteToWork = B28010_001E,
+  lessThanHS = B06009_002E,
+  highSchool = B06009_003E,
+  associatesDeg = B06009_004E,
+  bachelorDeg = B06009_005E,
+  professionalDeg = B06009_006E,
+  disability = B10052_002E)
+  
+mutate(
+  area_sqmile = st_area(geometry)/2590000,
+  vacancyPct = total_vacant.2020/area_sqmile,
+      pctWhite.2020 = total_White.2020/area_sqmile,
+      pctHL.2020 = total_HL.2020/area_sqmile,
+      pctNV.2020 = noV.2020/total_HU.2020*100,
+      pctUnder18.2020 = under18.2020/total_pop.2020,
+      pctDisAb.2020 = disAb.2020/total_pop.2020,
+      pop_dense = as.numeric(total_pop.2020 / area_sqmile)
   ) %>%
-    mutate(vacancyPct.2020 = total_vacant.2020/total_HU.2020,
-         pctWhite.2020 = total_White.2020/total_pop.2020,
-         pctHL.2020 = total_HL.2020/total_pop.2020,
-         pctNV.2020 = noV.2020/total_HU.2020*100,
-         pctUnder18.2020 = under18.2020/total_pop.2020,
-         pctDisAb.2020 = disAb.2020/total_pop.2020,
-         area_sqmile = st_area(geometry)/2590000,
-         pop_dense = as.numeric(total_pop.2020 / area_sqmile)
-         ) %>%
   st_as_sf(crs = 4269) 
 
 ```
 
 
-### Median household income
+## Median household income
 ```{r medhhinc, warning = FALSE, cache = TRUE}
 
 medHHInc <- 
@@ -589,7 +632,7 @@ medHHInc <-
 medHHInc
 ```
 
-### % White Population
+## % White Population
 
 ```{r plot_noV1, warning = FALSE, cache = TRUE}
 pctWhite <- 
@@ -615,7 +658,7 @@ pctWhite <-
 pctWhite
 ```
 
-### % Vacant Households
+## % Vacant Households
 
 ```{r}
 pctVacant <- ggplot()+
@@ -640,7 +683,7 @@ pctVacant <- ggplot()+
 pctVacant
 ```
 
-### % No Vehicle Households
+## % No Vehicle Households
 
 ```{r pct no vehicle}
 pctNoVehicle <- ggplot()+
@@ -665,7 +708,7 @@ pctNoVehicle <- ggplot()+
 pctNoVehicle
 ```
 
-### % Hispanic/Latino Population
+## % Hispanic/Latino Population
 
 ```{r hispanic latino pop}
 pctHL <- ggplot()+
@@ -690,7 +733,7 @@ pctHL <- ggplot()+
 pctHL
 ```
 
-### % Residents under the age of 18
+## % Residents under the age of 18
 
 ```{r pct under 18}
 pctUnder18 <- ggplot()+
@@ -715,7 +758,7 @@ pctUnder18 <- ggplot()+
 pctUnder18
 ```
 
-### % Disabled population
+## % Disabled population
 
 ```{r pct disab}
 pctDisabled <- ggplot()+
@@ -740,7 +783,7 @@ pctDisabled <- ggplot()+
 pctDisabled
 ```
 
-## Open Data El Paso
+
 
 ```{r open data el paso loading}
 road_centerlines <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = ''))
@@ -758,7 +801,7 @@ parks <- read_sf(paste(data_folder, "/ParkandRecreationFacilities.shp", sep = ''
 TIRZ <- read_sf(paste(data_folder, "/TIRZ.shp", sep = ''))
 ```
 
-### Existing Bike Lanes
+## Existing Bike Lanes + Other Roadway Infrastructure
 
 ```{r bike lanes}
 ggplot()+
@@ -777,7 +820,7 @@ ggplot()+
   mapTheme
 ```
 
-### Parks and Recreation Facilities
+## Parks and Recreation Facilities
 
 ```{r parks}
 parks$Type <- "park"
@@ -799,7 +842,7 @@ ggplot()+
   mapTheme
 ```
 
-### Tax Increment Reinvestment Zones
+## Tax Increment Reinvestment Zones
 
 ```{r}
 TIRZ$TIRZ = "TIRZ"
@@ -816,7 +859,7 @@ ggplot()+
   mapTheme
 ```
 
-# Feature Engineering
+
 
 ## National Walkability Index (2019)
 
@@ -927,121 +970,30 @@ head(el_paso_amenities$osm_points)
 # Bus Network and Maps
 
 
-
 ```{r}
-
-transitroutes <- transit_lines
-briolines <- transitroutes %>% filter(str_detect(route_long_name, 'BRIO')) %>%
-  st_transform(crs = 4269) 
-
-rivers <- read_sf(paste(data_folder, "/MajorRivers_dd83.shp", sep = '')) %>%
-  st_transform(crs = 4269) %>%
-  filter(NAME == "Rio Grande") %>% 
-  st_crop(y = geo_bb(elpaso, scale_factor = 1.1)) %>% 
-  st_union() %>% 
-  st_buffer(.003)
-
-
-futureLU <- read_sf(paste(data_folder, "/FutureLandUse.shp", sep = '')) %>% st_transform(crs = 4269)
-
-bounds <- geo_bb(briolines, scale_factor = 1.5)
-
-elpas <- elpaso %>% st_crop(y = bounds)
-riv <- rivers %>% st_crop(y = bounds)
-flu <- futureLU %>% st_crop(y = bounds)
-
-
-ftbliss <- futureLU %>% filter(COMMENTS %in% c("Fort Bliss Military"))
-ftbliss_small <- flu %>% filter(COMMENTS %in% c("Fort Bliss Military"))
-
-airport <- futureLU %>% filter(COMMENTS %in% c("Fort Bliss Mixed Use (Airport)"))
-
-
-airport_small <- flu %>% filter(COMMENTS %in% c("Fort Bliss Mixed Use (Airport)"))
-
-
-mtns <- futureLU %>% filter(COMMENTS %in% c("Preserve")) %>% arrange(-Shape_Area) %>% slice(1:2)
-
-mtns_small <- flu %>% filter(COMMENTS %in% c("Preserve")) %>% arrange(-Shape_Area) %>% slice(1:2)
+# 
+# g <- ggplot()+
+#   geom_sf(data = briolines %>% select(-route_long_name), size = 1.5, aes(color = route_id))+
+# 
+#   geom_sf(data = notbrio %>% select(-route_long_name), alpha = .75, color = 'grey')+
+#   geom_sf(data = notbrio, aes(group = route_long_name), color = 'red')+
+#   mapTheme+
+#   scale_color_manual(values = c('#B0C72C','#660066','#00A8E7'))+
+#   labs(title = 'Sun Metro Local Bus Network',
+#        subtitle = '{closest_state}')+
+#   theme(legend.position = 'none')+
+#   transition_states(route_long_name)+
+#   exit_fade()
+# 
+# animate(g, duration = 15, fps = 10, bg = 'black')
+# 
+# anim_save('citybusses.gif', g, path = "C:/Users/cchue/Documents/Penn MUSA/Spring/Practicum",  duration = 15, fps = 10, bg = 'black')
 ```
 
 
 
 
 
-```{r}
-#map of el paso geog and pop dense
-
-ggplot()+
-  geom_sf(data = elpaso, aes(fill = pop_dense), color = NA)+
-  geom_sf(data = ftbliss, fill = 'darkgreen', color = NA)+
-  geom_sf(data = mtns, fill = 'green', color = NA)+
-  geom_sf(data = airport, fill = 'darkgreen', color = NA)+
-  #geom_sf(data = juarez, fill = NA, color = 'lightgrey', alpha = .5)+
-  geom_sf(data = rivers, fill = 'lightblue', color = NA)+
-  paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
-  labs(fill = 'Population per \nSquare Mile', title = '')+
-  theme(legend.position = 'left')+
-  mapTheme
-
-
-```
-
-
-```{r}
-
-
-ggplot()+
-
-  #geom_sf(data = water, fill = 'lightblue', color = NA)+
-  geom_sf(data = elpas, aes(fill = pop_dense), color = NA)+
-  geom_sf(data = ftbliss_small, fill = 'darkgreen', color = NA)+
-  geom_sf(data = mtns_small, fill = 'green', color = NA)+
-  geom_sf(data = airport_small, fill = 'darkgreen', color = NA)+
-  geom_sf(data = briolines, size = 2, aes(color = route_long_name), alpha= 1)+
-   # geom_sf(data = juar, fill = NA, color = 'lightgrey', alpha = .5)+
-
-    geom_sf(data = rivers %>% st_crop(y = bounds), fill = 'lightblue', color = NA)+
-
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
-  scale_color_manual(values = c('#B0C72C','#660066','#00A8E7'))+
-  ##B0C72C Alameda
-  #660066 dyer
-  #00A8E7 mesa
-  #FFFFFF montana
-  labs(fill = 'Population per \nSquare Mile', title = '')+
-  mapTheme+
-  theme(legend.position = 'none')
-
-```
-
-
-
-
-
-
-```{r anim, cache=TRUE, results='markup'}
-
-notbrio <- transitroutes %>% filter(!str_detect(route_long_name, 'BRIO'))
-
-
-g <- ggplot()+
-  geom_sf(data = briolines %>% select(-route_long_name), size = 1.5, aes(color = route_id))+
-
-  geom_sf(data = notbrio %>% select(-route_long_name), alpha = .75, color = 'grey')+
-  geom_sf(data = notbrio, aes(group = route_long_name), color = 'red')+
-  mapTheme+
-  scale_color_manual(values = c('#B0C72C','#660066','#00A8E7'))+
-  labs(title = 'Sun Metro Local Bus Network',
-       subtitle = '{closest_state}')+
-  theme(legend.position = 'none')+
-  transition_states(route_long_name)+
-  exit_fade()
-
-
-animate(g, duration = 15, fps = 10, bg = 'black')
-    
-```
 
 
 # Modeling
