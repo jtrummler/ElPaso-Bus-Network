@@ -121,3 +121,14 @@ body {
 .graph-container{
     color: var(--color-light--3);
 }
+
+
+select.list_input {
+    padding: 8px;
+    font-size: 16px;
+    color: #333;
+    background-color: #f5f5f5;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    display: block;
+  }
