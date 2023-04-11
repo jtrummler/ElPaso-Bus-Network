@@ -377,17 +377,16 @@ walkscore_vars <- c()
 
 final_hex <- final_hex %>% select(ridership, lhodes_vars, census_vars, walkscore_vars, geometry) %>% st_sf()
 
-input <- final_hex
 
 ```
 
 ```{r data partition}
-inTrain <- createDataPartition(
-              y = final_hex$ridership, 
-              p = .80, list = FALSE)
-
-fh_train <- final_hex[-inTrain,]
-fh_test <- final_hex[inTrain,]
+# inTrain <- createDataPartition(
+#               y = final_hex$ridership, 
+#               p = .80, list = FALSE)
+# 
+# fh_train <- final_hex[-inTrain,]
+# fh_test <- final_hex[inTrain,]
 
 ```
 
@@ -402,24 +401,24 @@ fh_test <- final_hex[inTrain,]
 
 
 
-m1.train <- lm(formula = ridership ~ .,
-         data = final_hex %>% st_drop_geometry())
-
-# ... nodels for xgboost, rf, etc
-
-
-m1.test <-
-  fh_test %>%
-  mutate(ridership.pred = predict(m1.train, fh_test),
-         ridership.Error = ridership.pred - ridership,
-         ridership.AbsError = abs(ridership.pred - ridership),
-         ridership.APE = (abs(ridership.pred - ridership)) / ridership.pred)
-
-
-
-m1.mean <- m1.test %>% summarize(model = "OLS", mae = mean(ridership.AbsError),mape =mean(ridership.APE)) 
-
-m1.mean %>% st_drop_geometry() %>%  gt()
+# m1.train <- lm(formula = ridership ~ .,
+#          data = final_hex %>% st_drop_geometry())
+# 
+# # ... nodels for xgboost, rf, etc
+# 
+# 
+# m1.test <-
+#   fh_test %>%
+#   mutate(ridership.pred = predict(m1.train, fh_test),
+#          ridership.Error = ridership.pred - ridership,
+#          ridership.AbsError = abs(ridership.pred - ridership),
+#          ridership.APE = (abs(ridership.pred - ridership)) / ridership.pred)
+# 
+# 
+# 
+# m1.mean <- m1.test %>% summarize(model = "OLS", mae = mean(ridership.AbsError),mape =mean(ridership.APE)) 
+# 
+# m1.mean %>% st_drop_geometry() %>%  gt()
 
 
 ```
@@ -429,15 +428,15 @@ m1.mean %>% st_drop_geometry() %>%  gt()
 
 
 ```{r}
-fitControl <- trainControl(method = "cv", number = 100)
-set.seed(825)
-
-reg.cv <- 
-  train(ridership ~ ., data = st_drop_geometry(final_hex),  
-     method = "lm", trControl = fitControl, na.action = na.pass)
-
-
-reg.cv$resample[1:5,]
+# fitControl <- trainControl(method = "cv", number = 100)
+# set.seed(825)
+# 
+# reg.cv <- 
+#   train(ridership ~ ., data = st_drop_geometry(final_hex),  
+#      method = "lm", trControl = fitControl, na.action = na.pass)
+# 
+# 
+# reg.cv$resample[1:5,]
 
 ## ways to see if each cv group has downtown hex in test or training
  
@@ -449,25 +448,25 @@ reg.cv$resample[1:5,]
 
 
 ```{r predict ridership to hex}
-final_hex$predicted_ridership <- predict(m1.test)
-
-
-final_hex %>%
-  ggplot()+
-  geom_sf(aes(fill = predicted_ridership), color =NA)+
-  paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
-  labs(fill = 'Predicted Ridership')+
-  theme(legend.position = 'right')+
-  mapTheme
-
-
-m1.test %>%
-  ggplot()+
-  geom_sf(aes(fill = ridership.AbsError), color =NA)+
-  paletteer::scale_fill_paletteer_c("grDevices::Red-Blue", -1, labels= comma)+
-  labs(fill = 'Test set abs error')+
-  theme(legend.position = 'right')+
-  mapTheme
+# final_hex$predicted_ridership <- predict(m1.test)
+# 
+# 
+# final_hex %>%
+#   ggplot()+
+#   geom_sf(aes(fill = predicted_ridership), color =NA)+
+#   paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
+#   labs(fill = 'Predicted Ridership')+
+#   theme(legend.position = 'right')+
+#   mapTheme
+# 
+# 
+# m1.test %>%
+#   ggplot()+
+#   geom_sf(aes(fill = ridership.AbsError), color =NA)+
+#   paletteer::scale_fill_paletteer_c("grDevices::Red-Blue", -1, labels= comma)+
+#   labs(fill = 'Test set abs error')+
+#   theme(legend.position = 'right')+
+#   mapTheme
 #st_write(final_hex, "final_hex.geojson")
   
 ```
