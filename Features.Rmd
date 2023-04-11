@@ -1,0 +1,298 @@
+---
+title: "Features"
+author: "Charlie Huemmler, Yingxue Ou, Jack Rummler"
+date: "2023-04-08"
+output: html_document
+---
+
+```{r setup, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning=FALSE,
+                      message=FALSE,
+                      results='hide')
+
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(tigris)
+library(boxr)
+library(lubridate)
+library(here)
+library(readxl)
+library(gridExtra)
+library(scales)
+library(viridis)
+library(leaflet)
+library(ggplotify)
+library(ggmap)
+library(classInt)
+library(rlang)
+library(dplyr)
+library(maps)
+library(plotly)
+library(RColorBrewer)
+library(htmlwidgets)
+library(magick)
+library(cowplot)
+library(paletteer)
+library(stplanr)
+library(paletteer)
+library(scales)
+library(gganimate)
+library(transformr)
+library(scales)
+library(gganimate)
+library(glue)
+library(ggtext)
+library(gapminder)
+library(ggplot2)
+library(osmdata)
+#install.packages("mapview")
+library(mapview)
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(lehdr)
+library(here)
+library(cowplot)
+library(paletteer)
+library(scales)
+library(ggpubr)
+library(caret)
+
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+
+census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
+
+data_folder <- file.path(
+  here() %>% 
+    dirname(), 'data')
+
+mapTheme <- theme(
+  text = element_text( color = "black"),
+  plot.title = element_text(size = 14,colour = "black"),
+  plot.subtitle=element_text(face="italic"),
+  plot.caption=element_text(hjust=0),
+  axis.ticks = element_blank(),
+  panel.background = element_blank(),axis.title = element_blank(),
+  axis.text = element_blank(),
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "black", fill=NA, size=2)
+) 
+
+plotTheme <- theme(
+  text = element_text( color = "black"),
+  plot.title = element_text(size = 14,colour = "black"),
+  plot.subtitle=element_text(face="italic"),
+  plot.caption=element_text(hjust=0),
+  #axis.ticks = element_blank(),
+  panel.background = element_blank(),
+  #axis.title = element_blank(),
+  #axis.text = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "black", fill=NA, size=2)
+) 
+
+palette7 <- c("#B8860B", "#2F4F4F", "#8B0000", "#FFD700", "#556B2F", "#ADD8E6", "#FF69B4")
+palette6 <- c( "#2F4F4F", "#8B0000", "#FFD700", "#556B2F", "#ADD8E6", "#FF69B4")
+
+
+sf::sf_use_s2(FALSE)
+options(scipen=999)
+```
+
+```{r}
+# City Boundary
+el_paso <- read_sf(paste(data_folder, "/CityLimits.geojson", sep = ''))
+
+# Tax Increment Reinvestment Zones
+tirz <- read_sf(paste(data_folder, "/TIRZ.geojson", sep = ''))
+
+# Bike Lanes + Infrastructure
+bike_lanes <- read_sf(paste(data_folder, "/BikeLanes.geojson", sep = ''))
+
+# Parks
+parks <- read_sf(paste(data_folder, "/Parks.geojson", sep = ''))
+
+# Roads
+roads <- read_sf(paste(data_folder, "/roads_filtered.geojson", sep = ''))
+
+# FLUM
+flum <- read_sf(paste(data_folder, "/FutureLandUse.geojson", sep = ''))
+
+# Schools
+schools <- read_sf(paste(data_folder, "/Schools.geojson", sep=''))
+
+# Open Street Map
+
+#
+```
+
+# Schools
+
+```{r schools data cleaning}
+schools <- schools %>%
+  dplyr::filter(DISTRICT == "EL PASO") %>%
+  dplyr::filter(TYPE_ != "ADMIN") %>%
+  dplyr::filter(TYPE_ != "FACILITIES")
+
+ggplot() +
+  geom_sf(data = el_paso, fill = "grey", color = NA) +
+  geom_sf(data = schools, aes(color = TYPE_), size = 2, alpha=0.85) +
+  scale_color_manual(values = palette6, name = "Type") +
+  guides(color = guide_legend(override.aes = list(shape = 22, size = 5, fill=palette6))) +
+  labs(title="Schools",
+       subtitle="El Paso Independent School District",
+       caption="Source: Open Data El Paso, 2023")+
+  mapTheme
+```
+
+# Parks
+```{r}
+parks <- parks %>%
+  dplyr::filter(CATEGORY %in% c("City Park", "Open Space", "Trail", "Trailhead"))
+
+ggplot() +
+  geom_sf(data = el_paso, fill = "grey", color = NA) +
+  geom_sf(data = parks, aes(fill = CATEGORY, color = CATEGORY), size = 2, alpha=0.85) +
+  scale_fill_manual(values = palette6[1:4], name = "Type") +
+  scale_color_manual(values = palette6[1:4], name = "Type") +
+  guides(color = guide_legend(override.aes = list(shape = 22, size = 5, fill=palette6[1:4], color=palette6[1:4]))) +
+  labs(title="Parks",
+       subtitle="El Paso, TX",
+       caption="Source: Open Data El Paso, 2023")+
+  mapTheme
+```
+
+```{r}
+tirz <- tirz %>%
+  mutate(tirz = 'TIRZ')
+
+ggplot()+
+  geom_sf(data = el_paso, fill = "grey", color = NA) +
+  geom_sf(data = tirz, aes(fill = tirz, color=tirz), size = 2, alpha=0.85) +
+  scale_fill_manual(values=palette6[4], name='')+
+  scale_color_manual(values=palette6[4], name='')+
+  labs(title="Tax Increment Reinvestment Zones",
+       subtitle="El Paso, TX",
+       caption="Data: Open Data El Paso, 2023")+
+  mapTheme
+```
+
+## Bike Lanes + Road Infrastructure
+
+```{r transport infra}
+status_count <- table(bike_lanes$Status)
+status_count_df <- data.frame(Status = names(status_count), Count = as.vector(status_count))
+knitr::kable(status_count_df, caption = "Bike Lanes in El Paso, TX")
+```
+```{r}
+bike_lanes <- bike_lanes %>%
+  dplyr::filter(Status == "EXISTING")
+
+ggplot()+
+  geom_sf(data = el_paso, fill = "grey", color = NA) +
+  geom_sf(data = bike_lanes, aes(fill=Status, color=Status), size = 2, alpha=0.85) +
+  scale_fill_manual(values=palette6[4], name='Bike Lanes')+
+  scale_color_manual(values=palette6[4], name='Bike Lanes')+
+  labs(title="Bike Lane Infrastructure",
+       subtitle="El Paso, TX",
+       caption="Data: Open Data El Paso, 2023")+
+  mapTheme
+```
+
+```{r}
+road_class <- c(
+  "LOCAL" = "Local",
+  "MINOR" = "Minor",
+  "FREEWAY" = "Freeways",
+  "MAJOR" = "Major",
+  "COLLECTOR" = "Collector",
+  "INTERSTATE" = "Interstate",
+  "LOCAL\r\n" = "Local",
+  "LOCAL\r\n\r\n" = "Local",
+  "LOCAL\r\n\r\n\r\n" = "Local",
+  "LOCAL\r\n\r\n\r\n\r\n" = "Local"
+)
+
+roads$CLASS <- road_class[roads$CLASS]
+
+roads <- roads %>%
+  filter(!is.na(CLASS))
+
+roads_sf <- st_as_sf(roads, coords = NULL)
+
+class_count <- table(roads_sf$CLASS)
+
+class_count_df <- data.frame(CLASS = names(class_count), Count = as.vector(class_count))
+
+ggplot(class_count_df, aes(x = CLASS, y = Count, fill = CLASS)) +
+  geom_col() +
+  scale_fill_manual(values=c(palette6),
+                    name='Road Class')+
+  labs(title = "Road Classifications",
+       subtitle = "El Paso, TX",
+       caption = "Data: Open Data El Paso, 2023",
+       x = "Class",
+       y = "Count") +
+  plotTheme
+```
+
+```{r}
+major <- roads %>%
+  dplyr::filter(CLASS == "Major")
+
+ggplot()+
+  geom_sf(data = el_paso, fill = "grey", color = NA) +
+  geom_sf(data = major, aes(fill=CLASS, color=CLASS), size = 2, alpha=0.85) +
+  scale_fill_manual(values=palette6[4], name='Road Class')+
+  scale_color_manual(values=palette6[4], name='Road Class')+
+  labs(title="Major Roads",
+       subtitle="El Paso, TX",
+       caption="Data: Open Data El Paso, 2023")+
+  mapTheme
+```
+
+## Future Land Use Map (FLUM)
+
+```{r}
+flum_class <- c(
+  "Preserve" = "No",
+  "Post-War" = "No",
+  "Industrial and/or Railyards" = "No",
+  "Natural" = "No",
+  "Suburban (Walkable)" = "Yes",
+  "Agriculture" = "No",
+  "Fort Bliss Mixed Use (Airport)" = "No",
+  "Potential Annexation" = "No",
+  "Traditional Neighborhood (Walkable)" = "Yes",
+  "Remote" = "No",
+  "Urban Expansion" = "Yes",
+  "Rural Settlement (Remote)" = "No",
+  "Fort Bliss Military" = "No",
+  "Independent City" = "No", 
+  "Downtown" = "Yes",
+  "Military Reserve" = "No"
+)
+
+flum$TOD <- flum_class[flum$COMMENTS]
+
+ggplot()+
+  geom_sf(data = el_paso, fill = "grey", color = NA) +
+  geom_sf(data = flum, aes(fill=TOD, color=TOD), alpha=0.85) +
+  scale_fill_manual(values=palette6[3:4], name='TOD\nPotential')+
+  scale_color_manual(values=palette6[3:4], name='TOD\nPotential')+
+  labs(title="Future Transit Oriented Development Potential",
+       subtitle="El Paso, TX",
+       caption="Data: Open Data El Paso, 2023")+
+  mapTheme
+```
+
+## Open Street Map
+
+```{r}
+osm <- osmdata::osmdata_sf(el_paso)
+```
+
