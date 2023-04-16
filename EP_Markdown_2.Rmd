@@ -75,7 +75,8 @@ library(scales)
 library(ggpubr)
 library(caret)
 library(kableExtra)
-devtools::install_github("jamgreen/lehdr")
+library(FNN)
+#devtools::install_github("jamgreen/lehdr")
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
@@ -1444,6 +1445,71 @@ final_hex$uniqueID <- as.numeric(final_hex$uniqueID)
 ```
 
 ```{r}
+schools_hex <- schools %>%
+  st_transform(crs=4269) %>%
+  dplyr::select(c("OBJECTID", "geometry")) %>%
+  mutate(Legend = 'schools')
+
+parks_hex <- parks %>%
+  st_transform(crs=4269) %>%
+  dplyr::select(c("OBJECTID", "geometry")) %>%
+  mutate(Legend = 'parks')
+
+
+# tirz_hex <- tirz %>%
+#   st_transform(crs=4269) %>%
+#   dplyr::select(c("OBJECTID", "geometry"))
+
+# bike_hex <- bike_lanes %>%
+#   st_transform(crs=4269) %>%
+#   dplyr::select(c("OBJECTID", "geometry"))
+
+# flum_hex <- flum %>%
+#   st_transform(crs=4269) %>%
+#   dplyr::select(c("TOD", "geometry"))
+```
+
+
+```{r}
+hex_vars <- 
+  rbind(schools_hex,
+        parks_hex
+        ) %>%
+  st_join(., hex, join=st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID, Legend) %>%
+  summarize(count = n()) %>%
+    full_join(hex) %>%
+    spread(Legend, count, fill=0) %>%
+    st_sf() %>%
+    dplyr::select(-`<NA>`) %>%
+    na.omit() %>%
+    ungroup()
+
+st_c <- st_coordinates
+st_coid <- st_centroid
+
+hex_vars <-
+  hex_vars %>%
+    mutate(
+      schools.nn1 =
+        nn_function(st_c(st_coid(hex_vars)), st_c(schools_hex),1),
+      schools.nn3 =
+        nn_function(st_c(st_coid(hex_vars)), st_c(schools_hex),3),
+      schools.nn5 =
+        nn_function(st_c(st_coid(hex_vars)), st_c(schools_hex),5),
+      parks.nn1 =
+        nn_function(st_c(st_coid(hex_vars)), st_c(st_coid(parks_hex)),1),
+      parks.nn3 =
+        nn_function(st_c(st_coid(hex_vars)), st_c(st_coid(parks_hex)),3),
+      parks.nn5 =
+        nn_function(st_c(st_coid(hex_vars)), st_c(st_coid(parks_hex)),5))
+```
+
+
+### Modelling Begins
+
+```{r}
 set.seed(13)
 
 
@@ -1616,60 +1682,5 @@ xgb_val_fit_geo <- xgb_best_wf %>%
 
 ```
 
-```{r}
-schools_hex <- schools %>%
-  st_transform(crs=4269) %>%
-  dplyr::select(c("OBJECTID", "geometry"))
 
-parks_hex <- parks %>%
-  st_transform(crs=4269) %>%
-  dplyr::select(c("OBJECTID", "geometry"))
-
-tirz_hex <- tirz %>%
-  st_transform(crs=4269) %>%
-  dplyr::select(c("OBJECTID", "geometry"))
-
-bike_hex <- bike_lanes %>%
-  st_transform(crs=4269) %>%
-  dplyr::select(c("OBJECTID", "geometry"))
-
-flum_hex <- flum %>%
-  st_transform(crs=4269) %>%
-  dplyr::select(c("TOD", "geometry"))
-```
-
-
-```{r}
-hex_vars <- 
-  rbind(schools_hex,
-        parks_hex,
-        tirz_hex,
-        bike_hex
-        ) %>%
-  st_join(., hex, join=st_within) %>%
-  st_drop_geometry() %>%
-  group_by(uniqueID, Legend) %>%
-  summarize(count = n()) %>%
-    full_join(hex) %>%
-    spread(Legend, count, fill=0) %>%
-    st_sf() %>%
-    dplyr::select(-`<NA>`) %>%
-    na.omit() %>%
-    ungroup()
-
-st_c <- st_coordinates
-st_coid <- st_centroid
-
-hex_vars <-
-  hex_vars %>%
-    mutate(
-      schools.nn =
-        nn_function(st_c(st_coid(vars_net)), st_c(schools_hex),3),
-      parks.nn =
-        nn_function(st_c(st_coid(vars_net)), st_c(parks_hex),1),
-      tirz.nn =
-        nn_function(st_c(st_coid(vars_net)), st_c(tirz_hex),1),
-      bikes.nn =
-        nn_function(st_c(st_coid(vars_net)), st_c(bikes_hex),1))
-```
 
