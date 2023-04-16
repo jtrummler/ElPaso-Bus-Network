@@ -30,13 +30,16 @@ library(scales)
 library(ggpubr)
 library(rgdal)
 library(spdep)
-
+library(rsample)
 library(caret)
 library(ckanr)
 library(FNN)
+install.packages("set_engine")
 library(gt)
+library(recipes)
+library(set_engine)
 
-#devtools::install_github("jamgreen/lehdr")
+devtools::install_github("jamgreen/lehdr")
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
@@ -74,6 +77,38 @@ plotTheme <- theme(
 
 sf::sf_use_s2(FALSE)
 options(scipen=999)
+
+#Package installs -------------------------------------------------------------
+load.fun <- function(x) { 
+  x <- as.character(x) 
+  if(isTRUE(x %in% .packages(all.available=TRUE))) { 
+    eval(parse(text=paste("require(", x, ")", sep=""))) 
+    print(paste(c(x, " : already installed; requiring"), collapse=''))
+  } else { 
+    #update.packages()
+    print(paste(c(x, " : not installed; installing"), collapse=''))
+    eval(parse(text=paste("install.packages('", x, "')", sep=""))) 
+    print(paste(c(x, " : installed and requiring"), collapse=''))
+    eval(parse(text=paste("require(", x, ")", sep=""))) 
+  } 
+} 
+
+########### Required Packages ###########
+packages = c("bayesplot", "lme4","RcppEigen",
+             "tidyverse", "tidyr", "AmesHousing", "broom", "caret", "dials", "doParallel", "e1071", "earth",
+             "ggrepel", "glmnet", "ipred", "klaR", "kknn", "pROC", "rpart", "randomForest",
+             "sessioninfo", "tidymodels","ranger", "recipes", "workflows", "themis","xgboost",
+             "sf", "nngeo", "mapview")
+
+for(i in seq_along(packages)){
+  packge <- as.character(packages[i])
+  load.fun(packge)
+}
+
+session_info()
+
+#########################################
+
 ```
 
 
@@ -509,8 +544,9 @@ glimpse(model_rec %>% prep() %>% juice())
 
 ## Model specifications
 lm_plan <- 
-  linear_reg() %>% 
-  set_engine("lm")
+  linear_reg() 
+#%>% 
+ # set_engine("lm")
 
 glmnet_plan <- 
   linear_reg() %>% 
