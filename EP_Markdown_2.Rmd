@@ -76,7 +76,7 @@ library(ggpubr)
 library(caret)
 library(kableExtra)
 library(FNN)
-devtools::install_github("jamgreen/lehdr")
+#devtools::install_github("jamgreen/lehdr")
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
@@ -1797,11 +1797,14 @@ vars_net <- vars_net %>%
 final_hex <- merge(final_hex, vars_net, by = "uniqueID")
 ```
 
-<<<<<<< HEAD
+
+## Modeling
+
 ```{r modeling workflow, warning=FALSE, message=FALSE, results=FALSE}
 set.seed(13)
 
 input <- final_hex %>% 
+  dplyr::select(uniqueID, ridership, totalPop, highSchool, foodServicesPct) %>% 
   st_drop_geometry() %>% 
   mutate(cvID = sample(round(nrow(final_hex) / 24), 
                        size=nrow(final_hex), 
@@ -1817,7 +1820,7 @@ ep_test  <- testing(data_split)
 ## LOGOCV on Neighborhood with group_vfold_cv()
 cv_splits_geo <- group_vfold_cv(ep_train,  
                                 group = "cvID")
-print(cv_splits_geo)
+#print(cv_splits_geo)
 ```
 
 ```{r }
@@ -1825,7 +1828,9 @@ print(cv_splits_geo)
 
 # Feature Creation
 model_rec <- recipe(ridership ~ ., data = input) %>%
-  #update_role(Neighborhood, new_role = "Neighborhood") %>%
+  update_role(cvID, new_role = "cvID") %>%
+  update_role(uniqueID, new_role = "uniqueID") %>%
+
   #step_other(Neighborhood, threshold = 0.005) %>%
   #step_dummy(all_nominal(), -Neighborhood) %>%
   #step_log(Sale_Price, skip = TRUE) %>%
@@ -2111,15 +2116,6 @@ lm_full_mod     <- full_fit_lm  $fit$fit$fit
 glmnet_full_mod <- full_fit_glmnet$fit$fit$fit
 rf_full_mod     <- full_fit_rf  $fit$fit$fit
 xgb_full_mod    <- full_fit_xgb $fit$fit$fit
-
-
-
-
-
-
 ```
-=======
->>>>>>> 467d5899a26320c26100340ca09aafb13ac6adc9
-
 
 
