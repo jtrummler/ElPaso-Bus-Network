@@ -76,7 +76,7 @@ library(ggpubr)
 library(caret)
 library(kableExtra)
 library(FNN)
-#devtools::install_github("jamgreen/lehdr")
+devtools::install_github("jamgreen/lehdr")
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
@@ -186,17 +186,20 @@ El Paso is the sixth-largest city in Texas located at the far western tip of the
 
 <superbigimage>
 ```{r context map, warning=FALSE, message=FALSE, results=FALSE}
-ggplot()+
-  geom_sf(data=el_paso, fill="grey")+
-  geom_sf(data=rio, fill="skyblue", color="skyblue", size=500)+
-  geom_sf(data=franklin, fill="darkgreen", color="darkgreen", alpha=0.7)+
-  geom_sf(data=ft_bliss, fill="limegreen", color="limegreen", alpha=0.7)+
+plot <- ggplot() +
+  geom_sf(data=el_paso, fill="grey") +
+  geom_sf(data=rio, fill="skyblue", color="skyblue", size=500) +
+  geom_sf(data=franklin, fill="darkgreen", color="darkgreen", alpha=0.7) +
+  geom_sf(data=ft_bliss, fill="limegreen", color="limegreen", alpha=0.7) +
   labs(title="El Paso, Texas",
        subtitle="Context Map",
        caption="City limits in grey \nRio Grande River in blue \nFranklin Mountains in dark green \nFort Bliss Military Reserve in lime green")+
   mapTheme
+
+plot
 ```
 </superbigimage>
+
 
 
 ## Methodology
@@ -1155,6 +1158,9 @@ ggplot()+
   mapTheme
 ```
 
+
+
+
 ### Future Land Use Map (FLUM) and Transit-Oriented Development
 
 ```{r flum, warning=FALSE, message=FALSE, results=FALSE}
@@ -1182,8 +1188,8 @@ flum$TOD <- flum_class[flum$COMMENTS]
 ggplot()+
   geom_sf(data = el_paso, fill = "grey", color = NA) +
   geom_sf(data = flum, aes(fill=TOD, color=TOD), alpha=0.85) +
-  scale_fill_manual(values=palette6[3:4], name='TOD\nPotential')+
-  scale_color_manual(values=palette6[3:4], name='TOD\nPotential')+
+  scale_fill_manual(values=palette6[1:4], name='TOD\nPotential')+
+  scale_color_manual(values=palette6[1:4], name='TOD\nPotential')+
   labs(title="Future Transit Oriented Development Potential",
        subtitle="El Paso, TX",
        caption="Data: Open Data El Paso, 2023")+
@@ -1231,6 +1237,7 @@ for (amenity in amenities) {
   points_list[[amenity]] <- points
 }
 
+
 for (shop in shops) {
   query <- opq %>%
     add_osm_feature(key = "shop",
@@ -1242,21 +1249,136 @@ for (shop in shops) {
   points_list[[shop]] <- points
 }
 
-hospital_points <- points_list$hospital
-clinic_points <- points_list$clinic
-doctors_points <- points_list$doctors
-pharmacy_points <- points_list$pharmacy
-restaurant_points <- points_list$restaurant
-cafe_points <- points_list$cafe
-bar_points <- points_list$bar
-worship_points <- points_list$place_of_worship
-arts_points <- points_list$arts_centre
-cinema_points <- points_list$cinema
-theatre_points <- points_list$theatre
-department_store_points <- points_list$department_store
-general_points <- points_list$general
-supermarket_points <- points_list$supermarket
-mall_points <- points_list$mall
+hospital_points <- points_list$hospital %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="hospital") %>%
+  st_transform(crs=4269)
+  
+clinic_points <- points_list$clinic %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="clinic") %>%
+  st_transform(crs=4269)
+
+doctors_points <- points_list$doctors %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="clinic") %>%
+  st_transform(crs=4269)
+
+pharmacy_points <- points_list$pharmacy %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="pharmacy") %>%
+  st_transform(crs=4269)
+
+restaurant_points <- points_list$restaurant%>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="restaurant") %>%
+  st_transform(crs=4269)
+
+cafe_points <- points_list$cafe %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="cafe") %>%
+  st_transform(crs=4269)
+
+bar_points <- points_list$bar %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="bar") %>%
+  st_transform(crs=4269)
+
+worship_points <- points_list$place_of_worship %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="worship_place") %>%
+  st_transform(crs=4269)
+
+arts_points <- points_list$arts_centre %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="arts_place") %>%
+  st_transform(crs=4269)
+
+cinema_points <- points_list$cinema %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="cinema") %>%
+  st_transform(crs=4269)
+
+theatre_points <- points_list$theatre %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="theatre") %>%
+  st_transform(crs=4269)
+
+department_store_points <- points_list$department_store %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="department_store") %>%
+  st_transform(crs=4269)
+
+supermarket_points <- points_list$supermarket %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="supermarket") %>%
+  st_transform(crs=4269)
+
+mall_points <- points_list$mall %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="mall") %>%
+  st_transform(crs=4269)
+
+osm_points <- rbind(hospital_points, 
+      clinic_points,
+      doctors_points,
+      pharmacy_points,
+      restaurant_points,
+      cafe_points,
+      bar_points,
+      worship_points,
+      arts_points,
+      cinema_points,
+      theatre_points,
+      department_store_points,
+      supermarket_points,
+      mall_points)
+
+osm_points_st <- osm_points %>%
+  st_drop_geometry()
+
+health <- rbind(hospital_points, clinic_points, doctors_points, pharmacy_points)
+entertainment <- rbind(worship_points, arts_points, cinema_points, theatre_points)
+shop <- rbind(department_store_points, supermarket_points, mall_points)
+food <- rbind(restaurant_points, cafe_points, bar_points)
+
+ggplot(osm_points_st, aes(y = type)) +
+  geom_bar(fill = c(palette1)) +
+  ggtitle("Count of Each Open Street Map Feature") +
+  labs(subtitle="El Paso, TX") +
+  xlab("Count") +
+  ylab("Type") +
+  plotTheme
+```
+
+
+```{r different osm plots, warning=FALSE, message=FALSE, results=FALSE}
+grid.arrange(
+ggplot()+
+  geom_sf(data=el_paso, fill="grey")+
+  geom_sf(data=health, aes(color=type))+
+  scale_color_manual(values=c(palette6[3:5]), name="Type")+
+  labs(title="Healthcare Facilities")+
+  mapTheme,
+ggplot()+
+  geom_sf(data=el_paso, fill="grey")+
+  geom_sf(data=entertainment, aes(color=type))+
+  scale_color_manual(values=c(palette6[3:6]), name="Type")+
+  labs(title="Entertainment Places")+
+  mapTheme,
+ggplot()+
+  geom_sf(data=el_paso, fill="grey")+
+  geom_sf(data=shop, aes(color=type))+
+  scale_color_manual(values=c(palette6[3:5]), name="Type")+
+  labs(title="Shopping Centers")+
+  mapTheme,
+ggplot()+
+  geom_sf(data=el_paso, fill="grey")+
+  geom_sf(data=food, aes(color=type))+
+  scale_color_manual(values=c(palette6[3:5]), name="Type")+
+  labs(title="Eateries")+
+  mapTheme,
+ncol=2)
 ```
 
 # Modeling
@@ -1279,7 +1401,8 @@ load.fun <- function(x) {
 
 ########### Required Packages ###########
 packages = c("bayesplot", "lme4","RcppEigen",
-             "tidyverse", "tidyr", "AmesHousing", "broom", "caret", "dials", "doParallel", "e1071", "earth",
+             "tidyverse", "tidyr", "AmesHousing", "broom", "caret", "dials", "doParallel", "e1071", 
+             "earth",
              "ggrepel", "glmnet", "ipred", "klaR", "kknn", "pROC", "rpart", "randomForest",
              "sessioninfo", "tidymodels","ranger", "recipes", "workflows", "themis","xgboost",
              "sf", "nngeo", "mapview")
@@ -1403,6 +1526,7 @@ plot_grid(p1b,p1a,p1c, ncol=3)
   
 ```
 
+
 ```{r hex of cen nwi and lehd, warning=FALSE, message=FALSE, results=FALSE}
 ep_work_census <- ep_work_census %>%
   dplyr::select(-c("GEOID", "NAME", "OBJECTID", "NAME.1", "GlobalID", "Shape_Length", "Shape_Area",
@@ -1444,43 +1568,48 @@ final_hex <- final_hex %>%
 final_hex$uniqueID <- as.numeric(final_hex$uniqueID)
 ```
 
-```{r}
+```{r built environment feature engingeering, warning=FALSE, message=FALSE, results=FALSE}
 schools_hex <- schools %>%
   st_transform(crs=4269) %>%
-  dplyr::select(c("OBJECTID", "geometry")) %>%
-  mutate(Legend = 'schools')
+  dplyr::select(c("geometry")) %>%
+  mutate(type = "school")
 
 parks_hex <- parks %>%
   st_transform(crs=4269) %>%
-  dplyr::select(c("OBJECTID", "geometry")) %>%
-  mutate(Legend = 'parks')
+  dplyr::select(c("geometry")) %>%
+  mutate(type = "park")
 
+major_hex <- major %>%
+  dplyr::select(c("geometry")) %>%
+  mutate(type="major_road") %>%
+  st_transform(crs=4269)
 
-# tirz_hex <- tirz %>%
-#   st_transform(crs=4269) %>%
-#   dplyr::select(c("OBJECTID", "geometry"))
-
-# bike_hex <- bike_lanes %>%
-#   st_transform(crs=4269) %>%
-#   dplyr::select(c("OBJECTID", "geometry"))
-
-# flum_hex <- flum %>%
-#   st_transform(crs=4269) %>%
-#   dplyr::select(c("TOD", "geometry"))
-```
-
-
-```{r}
-hex_vars <- 
-  rbind(schools_hex,
-        parks_hex
-        ) %>%
+vars_net <- 
+  rbind(
+    schools_hex,
+    parks_hex,
+    major_hex,
+    hospital_points, 
+    clinic_points,
+    doctors_points,
+    pharmacy_points,
+    restaurant_points,
+    cafe_points,      
+    bar_points,
+    worship_points,
+    arts_points,
+    cinema_points,
+    theatre_points,
+    department_store_points,
+    supermarket_points,
+    mall_points
+) %>%
   st_join(., hex, join=st_within) %>%
   st_drop_geometry() %>%
-  group_by(uniqueID, Legend) %>%
+  group_by(uniqueID, type) %>%
   summarize(count = n()) %>%
     full_join(hex) %>%
-    spread(Legend, count, fill=0) %>%
+    spread(type, count, fill=0) %>%
     st_sf() %>%
     dplyr::select(-`<NA>`) %>%
     na.omit() %>%
@@ -1489,29 +1618,111 @@ hex_vars <-
 st_c <- st_coordinates
 st_coid <- st_centroid
 
-hex_vars <-
-  hex_vars %>%
+vars_net <-
+  vars_net %>%
     mutate(
       schools.nn1 =
-        nn_function(st_c(st_coid(hex_vars)), st_c(schools_hex),1),
+        nn_function(st_c(st_coid(vars_net)), st_c(schools_hex),1),
       schools.nn3 =
-        nn_function(st_c(st_coid(hex_vars)), st_c(schools_hex),3),
+        nn_function(st_c(st_coid(vars_net)), st_c(schools_hex),3),
       schools.nn5 =
-        nn_function(st_c(st_coid(hex_vars)), st_c(schools_hex),5),
+        nn_function(st_c(st_coid(vars_net)), st_c(schools_hex),5),
       parks.nn1 =
-        nn_function(st_c(st_coid(hex_vars)), st_c(st_coid(parks_hex)),1),
+        nn_function(st_c(st_coid(vars_net)), st_c(st_coid(parks_hex)),1),
       parks.nn3 =
-        nn_function(st_c(st_coid(hex_vars)), st_c(st_coid(parks_hex)),3),
+        nn_function(st_c(st_coid(vars_net)), st_c(st_coid(parks_hex)),3),
       parks.nn5 =
-        nn_function(st_c(st_coid(hex_vars)), st_c(st_coid(parks_hex)),5))
+        nn_function(st_c(st_coid(vars_net)), st_c(st_coid(parks_hex)),5),
+      hospitals.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(hospital_points),1),
+      hospitals.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(hospital_points),3),
+      hospitals.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(hospital_points),5),
+      clinics.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(clinic_points),1),
+      clinics.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(clinic_points),3),
+      clinics.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(clinic_points),5),
+      pharmacies.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(pharmacy_points),1),
+      pharmacies.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(pharmacy_points),3),
+      pharmacies.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(pharmacy_points),5),
+      restaurants.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(restaurant_points),1),
+      restaurants.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(restaurant_points),3),
+      restaurants.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(restaurant_points),5),
+      cafes.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(cafe_points),1),
+      cafes.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(cafe_points),3),
+      cafes.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(cafe_points),5),
+      bars.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(bar_points),1),
+      bars.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(bar_points),3),
+      bars.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(bar_points),5),
+      worship_places.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(worship_points),1),
+      worship_places.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(worship_points),3),
+      worship_places.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(worship_points),5),
+      arts.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(arts_points),1),
+      arts.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(arts_points),3),
+      arts.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(arts_points),5),
+      cinemas.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(cinema_points),1),
+      cinemas.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(cinema_points),3),
+      cinemas.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(cinema_points),5),
+      theatres.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(theatre_points),1),
+      theatres.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(theatre_points),3),
+      theatres.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(theatre_points),5),
+      department_stores.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(department_store_points),1),
+      department_stores.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(department_store_points),3),
+      department_stores.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(department_store_points),5),
+      supermarkets.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(supermarket_points),1),
+      supermarkets.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(supermarket_points),3),
+      supermarkets.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(supermarket_points),5),
+      malls.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(mall_points),1),
+      malls.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(mall_points),3),
+      malls.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(mall_points),5),
+      major_road.nn1 =
+        nn_function(st_c(st_coid(vars_net)), st_c(st_coid(major_hex)),1)
+    )
+
+vars_net <- vars_net %>%
+  st_drop_geometry()
+
+final_hex <- merge(final_hex, vars_net, by = "uniqueID")
 ```
 
-
-### Modelling Begins
-
-```{r}
+```{r modeling workflow, warning=FALSE, message=FALSE, results=FALSE}
 set.seed(13)
-
 
 input <- final_hex %>% 
   st_drop_geometry() %>% 
@@ -1551,9 +1762,8 @@ glimpse(model_rec %>% prep() %>% juice())
 
 ## Model specifications
 lm_plan <- 
-  linear_reg() 
-#%>% 
- # set_engine("lm")
+  linear_reg() %>% 
+  set_engine("lm")
 
 glmnet_plan <- 
   linear_reg() %>% 
