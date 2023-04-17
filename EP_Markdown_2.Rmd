@@ -1784,7 +1784,11 @@ vars_net <-
       malls.nn5 =
         nn_function(st_c(st_coid(vars_net)), st_c(mall_points),5),
       major_road.nn1 =
-        nn_function(st_c(st_coid(vars_net)), st_c(st_coid(major_hex)),1)
+        nn_function(st_c(st_coid(vars_net)), st_c(st_coid(major_hex)),1),
+      major_road.nn3 =
+        nn_function(st_c(st_coid(vars_net)), st_c(st_coid(major_hex)),3),
+      major_road.nn5 =
+        nn_function(st_c(st_coid(vars_net)), st_c(st_coid(major_hex)),5)
     )
 
 vars_net <- vars_net %>%
