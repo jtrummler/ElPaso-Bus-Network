@@ -3,7 +3,7 @@ title: "Forecasting Bus Transit Demand in El Paso, Texas"
 author: "Charlie Huemmler, Yingxue Ou & Jack Rummler"
 date: "2023-04-03"
 output: 
-  rmdformats::material:
+  rmdformats::downcute:
     code_folding: hide
 ---
 
@@ -113,6 +113,7 @@ plotTheme <- theme(
   panel.grid.minor = element_blank(),
   panel.border = element_rect(colour = "black", fill=NA, size=2)
 ) 
+palette8 <- c("#6F503E", "#F19179", "#F8AA60", "#A8A16A", "#A2B8E1", "#B898A5", "#9DA79F", "black")
 
 palette7 <- c("#6F503E", "#F19179", "#F8AA60", "#A8A16A", "#A2B8E1", "#B898A5", "#9DA79F" )
 
@@ -175,11 +176,34 @@ ft_bliss <- read_sf(paste(data_folder, "/Texas_Military_Boundaries.geojson", sep
 
 # OSM
 osm <- read_sf(paste(data_folder, "/export.geojson", sep = ''))
+
+# Local Transit Bays
+local_transit_bays <- read_sf(paste(data_folder, "/local_transit_bays.csv", sep = '')) %>%
+  st_as_sf(coords = c('lon', 'lat'), crs = 4269)
 ```
 
 ## Acknowledgement
 
 This project was created by Charlie Huemmler, Yingxue Ou, and Jack Rummler as part of the University of Pennsylvania Master of Urban Spatial Analytics practicum. We would like to thank our client, Alex Hoffman, AICP, of the El Paso Capital Improvements Department for his continual knowledge, eagerness to help, and enthusiasm for this project. We also would like to thank Professors Matthew Harris and Michael Fichman for their invaluable mentorship throughout this process.
+
+## Introduction and Use Case
+
+Transit ridership is often a key metric to assess the efficiency of public transportation systems. Like many transit agencies in the last decade, there has been annual decreases in transit ridership, with the starkest decline in ridership at the beginning of the COVID-19 pandemic. While many transit agencies are finally beginning to see comparable transit ridership now as compared to pre-2020, transit agencies are still grappling with how to maintain existing riders and lure new riders through trustworthy and connected service.
+
+Sun Metro Mass Transit Department, referred to as Sun Metro, is the transportation provider in El Paso, Texas and is a department of the city of El Paso. Sun Metro has experienced a similar nationwide trend of declining ridership for several years prior to the pandemic and a sharp decrease in ridership and service during and post-pandemic. Moreover, Sun Metro has made several expansions to its transit service in the past decade, which include but are not limited to:
+
+**Bus Rapid Transit (BRIO):** Introduced four BRIO lines between 2014 and 2022, which experience the agency’s highest ridership and most frequent service.  
+**Streetcar Network:** Re-ignited the streetcar network in 2018 using restored PCC streetcars, providing more circuitous service in downtown, uptown, and University of Texas at El Paso.  
+**El Paso Upper East Side Transit Center:** New transit center connected to the Five Points Transit Center, the Montana BRIO line, and more park-and-ride services.  
+
+Now, Sun Metro experiences about 63% of pre-pandemic ridership numbers, but the agency is looking to explore the implications of new bus transit alternative scenarios given its service expansions and future growth trajectory. Particularly, it is looking at ways to maximize equity and accessibility in addition to fare revenue optimization.
+
+The balance between equity and revenue can often be a challenge for transit agencies to balance. While agencies want to provide access to transit for all of its residents, and particularly those who may be transit-dependent for all of their trips, this means placing bus stops in under-resourced neighborhoods that may not be profitable for the agency. Our client revealed that the El Paso Capital Improvements Department is looking to invest a certain percentage of annual funds toward under-resourced areas. Our group defined equity as both the ability for all El Paso residents to have reasonable access to a bus stop while prioritizing transit-dependent populations.
+
+Thus, we are building a two-pronged informational network for our client. This includes:
+
+**Latent bus transit demand model:** We are predicting bus transit ridership based on 2022 ridership to model demand for transit services.
+
 
 ## El Paso Context
 
@@ -277,18 +301,18 @@ df <- df %>%
       RT == 26 ~ "Express",
       RT == 59 ~ "Express",
       RT == 76 ~ "Express",
-      RT == 11 ~ "Feeder",
-      RT == 12 ~ "Feeder",
-      RT == 13 ~ "Feeder",
-      RT == 16 ~ "Feeder",
-      RT == 19 ~ "Feeder",
-      RT == 43 ~ "Feeder",
-      RT == 44 ~ "Feeder",
-      RT == 46 ~ "Feeder",
-      RT == 56 ~ "Feeder",
-      RT == 60 ~ "Feeder",
-      RT == 84 ~ "Feeder",
-      RT == 89 ~ "Feeder",
+      RT == 11 ~ "Express",
+      RT == 12 ~ "Express",
+      RT == 13 ~ "Express",
+      RT == 16 ~ "Express",
+      RT == 19 ~ "Express",
+      RT == 43 ~ "Express",
+      RT == 44 ~ "Express",
+      RT == 46 ~ "Express",
+      RT == 56 ~ "Express",
+      RT == 60 ~ "Express",
+      RT == 84 ~ "Express",
+      RT == 89 ~ "Express",
       RT == 205 ~ "BRIO",
       RT == 206 ~ "BRIO",
       RT == 207 ~ "BRIO",
@@ -1085,7 +1109,7 @@ epworktidy <- epworkincome %>%
 
 ggplot(epworktidy, aes(x = Income, y = GEOID, fill = IncomeLevel)) +
   geom_bar(stat = "identity", position = "stack", width=2) +
-  scale_fill_manual(values=c(palette6[4:6]),
+  scale_fill_manual(values=c(palette5cont[1:3]),
                     labels=c("< 1250", "Between 1251 and 3334", " > 3334"))+
   labs(y = "Census Tract", x = "Income", fill = "Monthly \nIncome ($)") +
   plotTheme+
@@ -1462,6 +1486,21 @@ ggplot()+
 ncol=2)
 ```
 
+## Spatial Effects
+
+```{r spatial effects, warning=FALSE, message=FALSE, results=FALSE}
+ggplot()+
+  geom_sf(data=el_paso)+
+  geom_sf(data=local_transit_bays, aes(fill=name))+
+  scale_fill_manual(values=palette8)+
+  mapTheme
+
+bay_points <- local_transit_bays %>%
+  dplyr::select("geometry") %>%
+  mutate(type = "transit_bay")
+```
+
+
 # Modeling
 
 ```{r modeling package installs, include=FALSE}
@@ -1797,341 +1836,3 @@ vars_net <- vars_net %>%
 
 final_hex <- merge(final_hex, vars_net, by = "uniqueID")
 ```
-
-
-## Modeling
-
-```{r modeling workflow, warning=FALSE, message=FALSE, results=FALSE}
-set.seed(13)
-
-input <- final_hex  %>% 
-  st_drop_geometry() %>% 
-  mutate(cvID = sample(round(nrow(final_hex) / 24), 
-                       size=nrow(final_hex), 
-                       replace = TRUE) )
-
-### Initial Split for Training and Test
-data_split <- initial_split(input, strata = "ridership", prop = 0.75)
-ep_train <- training(data_split)
-ep_test  <- testing(data_split)
-
-
-### Cross Validation
-## LOGOCV on Neighborhood with group_vfold_cv()
-cv_splits_geo <- group_vfold_cv(ep_train,  
-                                group = "cvID")
-#print(cv_splits_geo)
-```
-
-```{r }
-### Create Recipes
-
-# Feature Creation
-model_rec <- recipe(ridership ~ ., data = ep_train) %>%
-  update_role(cvID, new_role = "cvID") %>%
-  update_role(uniqueID, new_role = "uniqueID") %>%
-  step_log(ridership, skip = TRUE, offset = 1) %>%
-  step_center(all_predictors(), -ridership) %>%
-  step_scale(all_predictors(), -ridership)
-
-  #step_ns(Latitude, Longitude, options = list(df = 2))
-
-# See the data after all transformations
-glimpse(model_rec %>% prep() %>% juice())
-
-## Model specifications
-lm_plan <- 
-  poisson_reg() %>% 
-  set_engine("zeroinfl")
-
-glmnet_plan <- 
-  poisson_reg() %>% 
-  set_args(penalty  = tune()) %>%
-  set_args(mixture  = tune()) %>%
-  set_engine("glmnet")
-
-rf_plan <- rand_forest() %>%
-  set_args(mtry  = tune()) %>%
-  set_args(min_n = tune()) %>%
-  set_args(trees = 2000) %>% 
-  set_engine("ranger", importance = "impurity") %>% 
-  set_mode("regression")
-
-XGB_plan <- boost_tree() %>%
-  set_args(mtry  = tune()) %>%
-  set_args(min_n = tune()) %>%
-  set_args(trees = 100) %>% 
-  set_engine("xgboost") %>% 
-  set_mode("regression")
-
-
-# Hyperparameter grid for glmnet (penalization)
-glmnet_grid <- expand.grid(penalty = seq(0, 1, by = .25), 
-                           mixture = seq(0,1,0.25))
-rf_grid <- expand.grid(mtry = seq(10,100,20), 
-                       min_n = c(10,30,60))
-xgb_grid <- expand.grid(mtry = seq(10,100,20), 
-                       min_n = c(10,30,60))
-
-
-# create workflow
-lm_wf <-
-  workflow() %>% 
-  add_recipe(model_rec) %>% 
-  add_model(lm_plan)
-glmnet_wf <-
-  workflow() %>% 
-  add_recipe(model_rec) %>% 
-  add_model(glmnet_plan)
-rf_wf <-
-  workflow() %>% 
-  add_recipe(model_rec) %>% 
-  add_model(rf_plan)
-xgb_wf <-
-  workflow() %>% 
-  add_recipe(model_rec) %>% 
-  add_model(XGB_plan)
-```
-
-```{r results='hide'}
-# fit model to workflow and calculate metrics
-control <- control_resamples(save_pred = TRUE, verbose = TRUE)
-metrics <- metric_set(rmse, rsq, mape, smape, mae)
-lm_tuned <- lm_wf %>%
-  tune::fit_resamples(.,
-                      resamples = cv_splits_geo,
-                      control   = control,
-                      metrics   = metrics)
-
-glmnet_tuned <- glmnet_wf %>%
-  tune::tune_grid(.,
-                  resamples = cv_splits_geo,
-                  grid      = glmnet_grid,
-                  control   = control,
-                  metrics   = metrics)
-
-rf_tuned <- rf_wf %>%
-  tune::tune_grid(.,
-                  resamples = cv_splits_geo,
-                  grid      = rf_grid,
-                  control   = control,
-                  metrics   = metrics)
-
-xgb_tuned <- xgb_wf %>%
-  tune::tune_grid(.,
-                  resamples = cv_splits_geo,
-                  grid      = xgb_grid,
-                  control   = control,
-                  metrics   = metrics)
-
-## metrics across grid
-autoplot(rf_tuned)
-collect_metrics(x_tuned)
-```
-
-```{r }
-## 'Best' by some metric and margin
-
-lm_best_params     <- select_best(lm_tuned, metric = "mae"    )
-glmnet_best_params <- select_best(glmnet_tuned, metric = "mae")
-rf_best_params     <- select_best(rf_tuned, metric = "rmse"    )
-xgb_best_params    <- select_best(xgb_tuned, metric = "mae"   )
-
-## Final workflow
-lm_best_wf     <- finalize_workflow(lm_wf, lm_best_params)
-glmnet_best_wf <- finalize_workflow(glmnet_wf, glmnet_best_params)
-rf_best_wf     <- finalize_workflow(rf_wf, rf_best_params)
-xgb_best_wf    <- finalize_workflow(xgb_wf, xgb_best_params)
-
-```
-
-```{r }
-
-# last_fit() emulates the process where, after determining the best model, the final fit on the entire training set is needed and is then evaluated on the test set.
-lm_val_fit_geo <- lm_best_wf %>% 
-  last_fit(split     = data_split,
-           control   = control,
-           metrics   = metrics)
-
-glmnet_val_fit_geo <- glmnet_best_wf %>% 
-  last_fit(split     = data_split,
-           control   = control,
-           metrics   = metrics)
-
-rf_val_fit_geo <- rf_best_wf %>% 
-  last_fit(split     = data_split,
-           control   = control,
-           metrics   = metrics)
-
-xgb_val_fit_geo <- xgb_best_wf %>% 
-  last_fit(split     = data_split,
-           control   = control,
-           metrics   = metrics)
-
-```
-```{r}
-full_fit_rf <- rf_best_wf %>% fit(input)
-
-output <- input
-
-output$pred <- predict(full_fit_rf, new_data = input) %>% exp()
-
-output <- output  %>% 
-  mutate(error = pred$.pred - ridership,
-         uniqueID = as.character(uniqueID))
-
-
-output_sf <- left_join(output, hex) %>% st_sf()
-
-ggplot(output_sf)+
-  geom_sf(aes(fill = error), color =NA)
-
-```
-
-
-
-```{r modeling pt 3}
-##########################################################
-# This script follows after 2_Regression_models_Geo.R
-##########################################################
-
-# Pull best hyperparam preds from out-of-fold predictions
-lm_best_OOF_preds <- collect_predictions(lm_tuned) 
-
-glmnet_best_OOF_preds <- collect_predictions(glmnet_tuned) %>% 
-  filter(penalty  == glmnet_best_params$penalty[1] & mixture == glmnet_best_params$mixture[1])
-
-# OOF prediction
-rf_best_OOF_preds <- collect_predictions(rf_tuned) %>% 
-  filter(mtry  == rf_best_params$mtry[1] & min_n == rf_best_params$min_n[1])
-
-xgb_best_OOF_preds <- collect_predictions(xgb_tuned) %>% 
-  filter(mtry  == xgb_best_params$mtry[1] & min_n == xgb_best_params$min_n[1])
-
-# collect validation set predictions from last_fit model
-lm_val_pred_geo     <- collect_predictions(lm_val_fit_geo)
-glmnet_val_pred_geo <- collect_predictions(glmnet_val_fit_geo)
-rf_val_pred_geo     <- collect_predictions(rf_val_fit_geo)
-xgb_val_pred_geo    <- collect_predictions(xgb_val_fit_geo)
-
-
-# Aggregate OOF predictions (they do not overlap with Validation prediction set)
-OOF_preds <- rbind(data.frame(dplyr::select(lm_best_OOF_preds, .pred, ridership), model = "lm"),
-                   data.frame(dplyr::select(glmnet_best_OOF_preds, .pred, ridership), model = "glmnet"),
-                   data.frame(dplyr::select(rf_best_OOF_preds, .pred, ridership), model = "rf"),
-                   data.frame(dplyr::select(xgb_best_OOF_preds, .pred, ridership), model = "xgb")) %>% 
-  group_by(model) %>% 
-  mutate(ridership = ridership,
-         RMSE = yardstick::rmse_vec(ridership, .pred),
-         MAE  = yardstick::mae_vec(ridership, .pred),
-         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
-  ungroup() %>% 
-  mutate(model = factor(model, levels=c("lm","glmnet","rf","xgb")))
-
-# average error for each model
-ggplot(data = OOF_preds %>% 
-         dplyr::select(model, MAPE) %>% 
-         distinct() , 
-       aes(x = model, y = MAPE, group = 1)) +
-  geom_path(color = "red") +
-  geom_label(aes(label = paste0(round(MAPE,1),"%"))) +
-  theme_bw()
-
-# OOF predicted versus actual
-ggplot(OOF_preds, aes(x = ridership, y = .pred, group = model)) +
-  geom_point(alpha = 0.3) +
-  geom_abline(linetype = "dashed", color = "red") +
-  geom_smooth(method = "lm", color = "blue") +
-  coord_equal() +
-  facet_wrap(~model, nrow = 2) +
-  theme_bw()
-
-
-# Aggregate predictions from Validation set
-val_preds <- rbind(data.frame(lm_val_pred_geo, model = "lm"),
-                   data.frame(glmnet_val_pred_geo, model = "glmnet"),
-                   data.frame(rf_val_pred_geo, model = "rf"),
-                   data.frame(xgb_val_pred_geo, model = "xgb")) %>% 
-  left_join(., input %>% dplyr::select(uniqueID) %>% 
-              rowid_to_column(var = ".row"), 
-            by = ".row") %>% 
-  group_by(model) %>%
-  mutate(ridership = ridership,
-         RMSE = yardstick::rmse_vec(ridership, .pred),
-         MAE  = yardstick::mae_vec(ridership, .pred),
-         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
-  ungroup() %>% 
-  mutate(model = factor(model, levels=c("lm","glmnet","rf","xgb")))
-
-# plot MAPE by model type
-ggplot(data = val_preds %>% 
-         dplyr::select(model, MAPE) %>% 
-         distinct() , 
-       aes(x = model, y = MAPE, group = 1)) +
-  geom_path(color = "red") +
-  geom_label(aes(label = paste0(round(MAPE,1),"%"))) +
-  theme_bw()
-
-# Validation Predicted vs. actual
-ggplot(val_preds, aes(x = ridership, y = .pred, group = model)) +
-  geom_point(alpha = 0.3) +
-  geom_abline(linetype = "dashed", color = "red") +
-  geom_smooth(method = "lm", color = "blue") +
-  coord_equal() +
-  facet_wrap(~model, nrow = 2) +
-  theme_bw()
-
-# join test data back to make spatial
-val_pred_sf <- val_preds %>% 
-  group_by(model) %>% 
-  rowwise() %>% 
-  mutate(RMSE = yardstick::rmse_vec(ridership, .pred),
-         MAE  = yardstick::mae_vec(ridership, .pred),
-         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
-  st_as_sf(., coords = c("Longitude", "Latitude"),
-           remove = FALSE,
-           crs = 4326)
-
-# map errors by point
-mapview(filter(val_pred_sf, model == "rf"), zcol = "MAPE")
-
-# aggregate val error to Neighborhood 
-val_MAPE_by_hood <- val_preds %>% 
-  group_by(Neighborhood, model) %>% 
-  summarise(RMSE = yardstick::rmse_vec(ridership, .pred),
-         MAE  = yardstick::mae_vec(ridership, .pred),
-         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
-  ungroup() 
-
-# plot MAPE by Hood
-ggplot(val_MAPE_by_hood, aes(x = reorder(Neighborhood, MAPE), y = MAPE)) +
-  geom_bar(stat = "identity") +
-  scale_y_continuous(breaks = seq(0,10,1)) +
-  theme_bw() +
-  theme(
-    axis.text.x = element_text(angle = -45, hjust = 0)
-  )
-
-## Fit and Extract final model
-## Final fit on all data, then extract model
-full_fit_lm     <- lm_best_wf %>% fit(ames)
-full_fit_glmnet <- glmnet_best_wf %>% fit(ames)
-full_fit_rf     <- rf_best_wf %>% fit(input)
-full_fit_xgb    <- xgb_best_wf %>% fit(ames)
-
-# #1 predicting while staying in tidymodels
-predict(full_fit_rf, new_data = ames[3,]) %>% 
-  mutate(.pred_original = exp(.pred))
-
-# #2 extract final model object
-lm_full_mod     <- full_fit_lm$fit$fit$fit
-glmnet_full_mod <- full_fit_glmnet$fit$fit$fit
-rf_full_mod     <- full_fit_rf$fit$fit$fit
-xgb_full_mod    <- full_fit_xgb$fit$fit$fit
-
-# predicting on extracted model object
-MY_DATA_juiced <- prep(MY_DATA) %>% bake() %>% juice()
-predict(rf_full_mod, new_data = MY_DATA_juiced)
-```
-
-
