@@ -76,6 +76,7 @@ library(ggpubr)
 library(caret)
 library(kableExtra)
 library(FNN)
+library(poissonreg)
 #devtools::install_github("jamgreen/lehdr")
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
@@ -1803,8 +1804,7 @@ final_hex <- merge(final_hex, vars_net, by = "uniqueID")
 ```{r modeling workflow, warning=FALSE, message=FALSE, results=FALSE}
 set.seed(13)
 
-input <- final_hex %>% 
-  dplyr::select(uniqueID, ridership, totalPop, highSchool, foodServicesPct) %>% 
+input <- final_hex  %>% 
   st_drop_geometry() %>% 
   mutate(cvID = sample(round(nrow(final_hex) / 24), 
                        size=nrow(final_hex), 
@@ -1827,30 +1827,25 @@ cv_splits_geo <- group_vfold_cv(ep_train,
 ### Create Recipes
 
 # Feature Creation
-model_rec <- recipe(ridership ~ ., data = input) %>%
+model_rec <- recipe(ridership ~ ., data = ep_train) %>%
   update_role(cvID, new_role = "cvID") %>%
   update_role(uniqueID, new_role = "uniqueID") %>%
-
-  #step_other(Neighborhood, threshold = 0.005) %>%
-  #step_dummy(all_nominal(), -Neighborhood) %>%
-  #step_log(Sale_Price, skip = TRUE) %>%
-  #step_zv(all_predictors()) %>%
+  step_log(ridership, skip = TRUE, offset = 1) %>%
   step_center(all_predictors(), -ridership) %>%
   step_scale(all_predictors(), -ridership)
 
-  #step_ns(Latitude, Longitude, options = list(df = 4))
+  #step_ns(Latitude, Longitude, options = list(df = 2))
 
 # See the data after all transformations
 glimpse(model_rec %>% prep() %>% juice())
 
-
 ## Model specifications
 lm_plan <- 
-  linear_reg() %>% 
-  set_engine("lm")
+  poisson_reg() %>% 
+  set_engine("zeroinfl")
 
 glmnet_plan <- 
-  linear_reg() %>% 
+  poisson_reg() %>% 
   set_args(penalty  = tune()) %>%
   set_args(mixture  = tune()) %>%
   set_engine("glmnet")
@@ -1858,7 +1853,7 @@ glmnet_plan <-
 rf_plan <- rand_forest() %>%
   set_args(mtry  = tune()) %>%
   set_args(min_n = tune()) %>%
-  set_args(trees = 1000) %>% 
+  set_args(trees = 2000) %>% 
   set_engine("ranger", importance = "impurity") %>% 
   set_mode("regression")
 
@@ -1873,10 +1868,10 @@ XGB_plan <- boost_tree() %>%
 # Hyperparameter grid for glmnet (penalization)
 glmnet_grid <- expand.grid(penalty = seq(0, 1, by = .25), 
                            mixture = seq(0,1,0.25))
-rf_grid <- expand.grid(mtry = c(2,5), 
-                       min_n = c(1,5))
-xgb_grid <- expand.grid(mtry = c(3,5), 
-                        min_n = c(1,5))
+rf_grid <- expand.grid(mtry = seq(10,100,20), 
+                       min_n = c(10,30,60))
+xgb_grid <- expand.grid(mtry = seq(10,100,20), 
+                       min_n = c(10,30,60))
 
 
 # create workflow
@@ -1898,7 +1893,7 @@ xgb_wf <-
   add_model(XGB_plan)
 ```
 
-```{r }
+```{r results='hide'}
 # fit model to workflow and calculate metrics
 control <- control_resamples(save_pred = TRUE, verbose = TRUE)
 metrics <- metric_set(rmse, rsq, mape, smape, mae)
@@ -1930,21 +1925,17 @@ xgb_tuned <- xgb_wf %>%
                   metrics   = metrics)
 
 ## metrics across grid
-autoplot(xgb_tuned)
-collect_metrics(xgb_tuned)
+autoplot(rf_tuned)
+collect_metrics(x_tuned)
 ```
 
 ```{r }
 ## 'Best' by some metric and margin
-show_best(lm_tuned, metric = "mae", n = 15)
-show_best(glmnet_tuned, metric = "mape", n = 15)
-show_best(rf_tuned, metric = "rsq", n = 15)
-show_best(xgb_tuned, metric = "rsq", n = 15)
 
-lm_best_params     <- select_best(lm_tuned, metric = "rmse"    )
-glmnet_best_params <- select_best(glmnet_tuned, metric = "rmse")
+lm_best_params     <- select_best(lm_tuned, metric = "mae"    )
+glmnet_best_params <- select_best(glmnet_tuned, metric = "mae")
 rf_best_params     <- select_best(rf_tuned, metric = "rmse"    )
-xgb_best_params    <- select_best(xgb_tuned, metric = "rmse"   )
+xgb_best_params    <- select_best(xgb_tuned, metric = "mae"   )
 
 ## Final workflow
 lm_best_wf     <- finalize_workflow(lm_wf, lm_best_params)
@@ -1978,6 +1969,26 @@ xgb_val_fit_geo <- xgb_best_wf %>%
            metrics   = metrics)
 
 ```
+```{r}
+full_fit_rf <- rf_best_wf %>% fit(input)
+
+output <- input
+
+output$pred <- predict(full_fit_rf, new_data = input) %>% exp()
+
+output <- output  %>% 
+  mutate(error = pred$.pred - ridership,
+         uniqueID = as.character(uniqueID))
+
+
+output_sf <- left_join(output, hex) %>% st_sf()
+
+ggplot(output_sf)+
+  geom_sf(aes(fill = error), color =NA)
+
+```
+
+
 
 ```{r modeling pt 3}
 ##########################################################
@@ -1990,6 +2001,7 @@ lm_best_OOF_preds <- collect_predictions(lm_tuned)
 glmnet_best_OOF_preds <- collect_predictions(glmnet_tuned) %>% 
   filter(penalty  == glmnet_best_params$penalty[1] & mixture == glmnet_best_params$mixture[1])
 
+# OOF prediction
 rf_best_OOF_preds <- collect_predictions(rf_tuned) %>% 
   filter(mtry  == rf_best_params$mtry[1] & min_n == rf_best_params$min_n[1])
 
@@ -2009,7 +2021,7 @@ OOF_preds <- rbind(data.frame(dplyr::select(lm_best_OOF_preds, .pred, ridership)
                    data.frame(dplyr::select(rf_best_OOF_preds, .pred, ridership), model = "rf"),
                    data.frame(dplyr::select(xgb_best_OOF_preds, .pred, ridership), model = "xgb")) %>% 
   group_by(model) %>% 
-  mutate(ridership = log(ridership),
+  mutate(ridership = ridership,
          RMSE = yardstick::rmse_vec(ridership, .pred),
          MAE  = yardstick::mae_vec(ridership, .pred),
          MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
@@ -2044,7 +2056,7 @@ val_preds <- rbind(data.frame(lm_val_pred_geo, model = "lm"),
               rowid_to_column(var = ".row"), 
             by = ".row") %>% 
   group_by(model) %>%
-  mutate(ridership = log(ridership),
+  mutate(ridership = ridership,
          RMSE = yardstick::rmse_vec(ridership, .pred),
          MAE  = yardstick::mae_vec(ridership, .pred),
          MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
@@ -2104,18 +2116,22 @@ ggplot(val_MAPE_by_hood, aes(x = reorder(Neighborhood, MAPE), y = MAPE)) +
 ## Final fit on all data, then extract model
 full_fit_lm     <- lm_best_wf %>% fit(ames)
 full_fit_glmnet <- glmnet_best_wf %>% fit(ames)
-full_fit_rf     <- rf_best_wf %>% fit(ames)
+full_fit_rf     <- rf_best_wf %>% fit(input)
 full_fit_xgb    <- xgb_best_wf %>% fit(ames)
 
+# #1 predicting while staying in tidymodels
 predict(full_fit_rf, new_data = ames[3,]) %>% 
   mutate(.pred_original = exp(.pred))
 
-
-# extract final model object
-lm_full_mod     <- full_fit_lm  $fit$fit$fit
+# #2 extract final model object
+lm_full_mod     <- full_fit_lm$fit$fit$fit
 glmnet_full_mod <- full_fit_glmnet$fit$fit$fit
-rf_full_mod     <- full_fit_rf  $fit$fit$fit
-xgb_full_mod    <- full_fit_xgb $fit$fit$fit
+rf_full_mod     <- full_fit_rf$fit$fit$fit
+xgb_full_mod    <- full_fit_xgb$fit$fit$fit
+
+# predicting on extracted model object
+MY_DATA_juiced <- prep(MY_DATA) %>% bake() %>% juice()
+predict(rf_full_mod, new_data = MY_DATA_juiced)
 ```
 
 
