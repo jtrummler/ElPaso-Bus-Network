@@ -790,19 +790,13 @@ nwi <- read_csv(paste(data_folder, "/nwi2019.csv", sep = '')) %>%
                   "D4A", # distance from population-weighted centroid to nearest transit stop
                   "D5AR", # regional accessibility for access to jobs
                   "D5BR", # destination accessibility via transit
-  ))
-
-nwi$GEOID <- paste0(substr(nwi$GEOID10, 1, 5), "0", sprintf("%05d", nwi$TRACTCE), nwi$BLKGRPCE)
+  )) %>% mutate(tractblock = as.numeric(TRACTCE)*10+as.numeric(BLKGRPCE))
 
 blocks <-read_sf(paste(data_folder, "/tl_2019_48_bg.shp", sep = '')) %>%
   dplyr::filter(COUNTYFP == 141) %>%
-  dplyr::select(-c("STATEFP", "COUNTYFP", "TRACTCE", "BLKGRPCE", "NAMELSAD", "MTFCC", "FUNCSTAT", "ALAND", "AWATER", "INTPTLAT", "INTPTLON"))
+  dplyr::select(c("TRACTCE", "BLKGRPCE")) %>% mutate(tractblock = as.numeric(TRACTCE)*10+as.numeric(BLKGRPCE))
 
-nwi_bg <- left_join(nwi, blocks, by = "GEOID")
-
-nwi_bg <- st_as_sf(nwi_bg)
-
-nwi_bg <- nwi_bg %>%
+nwi_bg <- left_join(nwi, blocks, by = "tractblock") %>% st_sf() %>%
   rename(
     totalPop = TotPop,
     housingUnits = CountHU,
@@ -820,23 +814,24 @@ nwi_bg <- nwi_bg %>%
     nearestTransit = D4A,
     jobAccessibility = D5AR,
     destinationAccessibility = D5BR
-  )
-
-nwi_bg %>%
+  ) %>%
   dplyr::select(-c("OBJECTID",
                    "GEOID10",
-                   "TRACTCE",
-                   "BLKGRPCE",))
+                   "TRACTCE.x",
+                   "TRACTCE.y",
+                  "BLKGRPCE.y",
+                   "BLKGRPCE.x",
+                  "tractblock")) %>% 
+  st_transform(st_crs(el_paso))
 
-st_crs(nwi_bg) <- st_crs(el_paso)
-nwi_bg <- st_intersection(nwi_bg, el_paso)
-nwi_bg_st <- st_drop_geometry(nwi_bg)
 
-nwi_bg_NA <- nwi_bg %>%
+
+nwi_bg_NA <- st_intersection(nwi_bg, el_paso) %>%
   dplyr::filter(nearestTransit != -99999.00)
 
-nwi_bg_st_NA <- nwi_bg_st %>%
-  dplyr::filter(nearestTransit != -99999.00)
+
+nwi_bg_st_NA <- st_drop_geometry(nwi_bg_NA)
+
 ```
 
 ### Nearest Transit Accessibility
@@ -1562,7 +1557,7 @@ stop_riders_agg_noBRT <- stop_riders_agg %>%
 stop_riders_agg_BRT <- stop_riders_agg %>% 
   filter(RT %in% c(205,206,207,208))
 
-ridership_net_local <-  %>% # Local Bus RT ridership
+ridership_net_local <- stop_riders_agg %>% # Local Bus RT ridership
   dplyr::select(ridership) %>% 
   aggregate(., hex, sum) %>%
   mutate(ridership = replace_na(ridership, 0),
@@ -1628,12 +1623,17 @@ census_lehd_hex <- hex %>%
 nwi_bg <- nwi_bg %>%
   st_transform(crs=4269)
 
-nwi_bg_hex <- nwi_bg %>%
-  dplyr::select(-c("OBJECTID", "GEOID10", "TRACTCE", "BLKGRPCE", "totalPop", "GEOID", "OBJECTID.1", "NAME", "GlobalID", "Shape_Length", "Shape_Area"))
 
 nwi_hex <- hex %>%
   st_centroid() %>%
-  st_join(nwi_bg_hex, join=st_within)
+  st_join(nwi_bg, join=st_within)%>% 
+  st_drop_geometry() %>% 
+  full_join(., hex) %>% 
+  st_sf()
+
+ggplot()+
+  geom_sf(data = hex)+
+  geom_sf(data = nwi_bg, fill = NA)
 
 final_hex <- left_join(ridership_net_local, st_drop_geometry(census_lehd_hex), by = "uniqueID") %>% 
   left_join(st_drop_geometry(nwi_hex), by = "uniqueID") %>% 
@@ -1804,17 +1804,13 @@ final_hex <- merge(final_hex, vars_net, by = "uniqueID")
 # add features for # of bus stops in hex, # of transit bay bus stops
 busstopnet <- hex %>% st_join(stop_riders_agg_noBRT %>% mutate(stop1 = 1)) %>% mutate(stop1 = replace_na(stop1, 0)) %>% group_by(uniqueID) %>% summarise(stops_in_hex = sum(stop1))
 
-busbaysnet <- hex %>% st_join(local_transit_bays %>% mutate(stop1 = 1)) %>% mutate(stop1 = replace_na(stop1, 0)) %>% group_by(uniqueID) %>% summarise(stops_in_hex = sum(stop1))
+busbaysnet <- hex %>% st_join(local_transit_bays %>% mutate(stop1 = 1)) %>% mutate(stop1 = replace_na(stop1, 0)) %>% group_by(uniqueID) %>% summarise(bays_in_hex = sum(stop1))
 
 final_hex <- merge(final_hex, busstopnet %>% st_drop_geometry(), by = "uniqueID")
 
 final_hex <- merge(final_hex, busbaysnet %>% st_drop_geometry(), by = "uniqueID")
 
-
-
-#compare mapes
-
-#downtown hex? 
+#st_write(final_hex, paste(data_folder,'/final_hex1.geojson', sep = ''), append = F)
 ```
 
 
