@@ -79,6 +79,35 @@ library(FNN)
 library(poissonreg)
 #devtools::install_github("jamgreen/lehdr")
 
+load.fun <- function(x) { 
+  x <- as.character(x) 
+  if(isTRUE(x %in% .packages(all.available=TRUE))) { 
+    eval(parse(text=paste("require(", x, ")", sep=""))) 
+    print(paste(c(x, " : already installed; requiring"), collapse=''))
+  } else { 
+    #update.packages()
+    print(paste(c(x, " : not installed; installing"), collapse=''))
+    eval(parse(text=paste("install.packages('", x, "')", sep=""))) 
+    print(paste(c(x, " : installed and requiring"), collapse=''))
+    eval(parse(text=paste("require(", x, ")", sep=""))) 
+  } 
+} 
+
+########### Required Packages ###########
+packages = c("bayesplot", "lme4","RcppEigen",
+             "tidyverse", "tidyr", "AmesHousing", "broom", "caret", "dials", "doParallel", "e1071", 
+             "earth",
+             "ggrepel", "glmnet", "ipred", "klaR", "kknn", "pROC", "rpart", "randomForest",
+             "sessioninfo", "tidymodels","ranger", "recipes", "workflows", "themis","xgboost",
+             "sf", "nngeo", "mapview")
+
+for(i in seq_along(packages)){
+  packge <- as.character(packages[i])
+  load.fun(packge)
+}
+
+session_info()
+
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
 census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
@@ -188,7 +217,13 @@ This project was created by Charlie Huemmler, Yingxue Ou, and Jack Rummler as pa
 
 ## Introduction and Use Case
 
-Transit ridership is often a key metric to assess the efficiency of public transportation systems. Like many transit agencies in the last decade, there has been annual decreases in transit ridership, with the starkest decline in ridership at the beginning of the COVID-19 pandemic. While many transit agencies are finally beginning to see comparable transit ridership now as compared to pre-2020, transit agencies are still grappling with how to maintain existing riders and lure new riders through trustworthy and connected service.
+![Image Credit: El Paso Capital Improvements Division]("C:/Users/jtrum/Desktop/MUSA8010/imgs/img1.PNG")
+
+>   "El Paso, often forgotten, is building a stronger transit network than most US cities." 
+>   Christof Spieler (Trains, Buses, People) 
+
+
+Transit ridership is often a key metric to assess the efficiency of public transportation systems. Like many transit agencies in the last decade, there has been annual decreases in transit ridership, with the sharpest decline in ridership at the beginning of the COVID-19 pandemic. While many transit agencies are finally beginning to see comparable transit ridership now as compared to pre-2020, transit agencies are still grappling with how to maintain existing riders and lure new riders through trustworthy and connected service.
 
 Sun Metro Mass Transit Department, referred to as Sun Metro, is the transportation provider in El Paso, Texas and is a department of the city of El Paso. Sun Metro has experienced a similar nationwide trend of declining ridership for several years prior to the pandemic and a sharp decrease in ridership and service during and post-pandemic. Moreover, Sun Metro has made several expansions to its transit service in the past decade, which include but are not limited to:
 
@@ -200,9 +235,11 @@ Now, Sun Metro experiences about 63% of pre-pandemic ridership numbers, but the 
 
 The balance between equity and revenue can often be a challenge for transit agencies to balance. While agencies want to provide access to transit for all of its residents, and particularly those who may be transit-dependent for all of their trips, this means placing bus stops in under-resourced neighborhoods that may not be profitable for the agency. Our client revealed that the El Paso Capital Improvements Department is looking to invest a certain percentage of annual funds toward under-resourced areas. Our group defined equity as both the ability for all El Paso residents to have reasonable access to a bus stop while prioritizing transit-dependent populations.
 
-Thus, we are building a two-pronged informational network for our client. This includes:
+Thus, we are building a two-pronged project for our client. This includes:
 
-**Latent bus transit demand model:** We are predicting bus transit ridership based on 2022 ridership to model demand for transit services.
+**Latent bus transit demand model:** We are predicting bus transit ridership based on 2022 ridership to model demand for transit services in the future. We are building correlative
+
+**Informational Network:** A scoring network to assess ridership on equity and revenue based indicators.
 
 
 ## El Paso Context
@@ -301,25 +338,25 @@ df <- df %>%
       RT == 26 ~ "Express",
       RT == 59 ~ "Express",
       RT == 76 ~ "Express",
-      RT == 11 ~ "Express",
-      RT == 12 ~ "Express",
-      RT == 13 ~ "Express",
-      RT == 16 ~ "Express",
-      RT == 19 ~ "Express",
-      RT == 43 ~ "Express",
-      RT == 44 ~ "Express",
-      RT == 46 ~ "Express",
-      RT == 56 ~ "Express",
-      RT == 60 ~ "Express",
-      RT == 84 ~ "Express",
-      RT == 89 ~ "Express",
+      RT == 11 ~ "Feeder",
+      RT == 12 ~ "Feeder",
+      RT == 13 ~ "Feeder",
+      RT == 16 ~ "Feeder",
+      RT == 19 ~ "Feeder",
+      RT == 43 ~ "Feeder",
+      RT == 44 ~ "Feeder",
+      RT == 46 ~ "Feeder",
+      RT == 56 ~ "Feeder",
+      RT == 60 ~ "Feeder",
+      RT == 84 ~ "Feeder",
+      RT == 89 ~ "Feeder",
       RT == 205 ~ "BRIO",
       RT == 206 ~ "BRIO",
       RT == 207 ~ "BRIO",
       RT == 208 ~ "BRIO",
       RT == 17 ~ "Other",
       RT == 20 ~ "Other",
-      RT == 21 ~ "Other",
+      RT == 21 ~ "Circulator",
       RT == 41 ~ "Other",
       RT == 82 ~ "Other",
       RT == 87 ~ "Other",
@@ -327,7 +364,10 @@ df <- df %>%
     )
   )
 
-local <- df[df$type %in% "Local", ]
+df <- df %>%
+  dplyr::filter(type != "Other")
+
+local1 <- df[df$type %in% "Local", ]
 
 # Aggregating at route level for average and total ridership 
 RT_avg_sum <- df %>%
@@ -339,7 +379,7 @@ RT_avg_sum <- df %>%
   mutate(total_ridership = total_ons + total_offs) %>%
   mutate(
     type = case_when(
-      RT == 2 ~ "Local",
+            RT == 2 ~ "Local",
       RT == 7 ~ "Local",
       RT == 10 ~ "Local",
       RT == 14 ~ "Local",
@@ -395,7 +435,7 @@ RT_avg_sum <- df %>%
       RT == 208 ~ "BRIO",
       RT == 17 ~ "Other",
       RT == 20 ~ "Other",
-      RT == 21 ~ "Other",
+      RT == 21 ~ "Circulator",
       RT == 41 ~ "Other",
       RT == 82 ~ "Other",
       RT == 87 ~ "Other",
@@ -403,7 +443,6 @@ RT_avg_sum <- df %>%
     )
   )
 
-# Aggregating at route and stop level
 RT_stop_avg <- df %>%
   group_by(RT, TP, longitude, latitude) %>%
   summarize(avg_ons = mean(Ons), 
@@ -413,7 +452,107 @@ RT_stop_avg <- df %>%
   mutate(total_ridership = (total_ons + total_offs))
 ```
 
-## Current bus network operations
+## Current Bus Network
+
+```{r bus netwrorks}
+classified <- bus_routes %>% 
+    mutate(
+    type = case_when(
+      ROUTE == 2 ~ "Local",
+      ROUTE == 7 ~ "Local",
+      ROUTE == 10 ~ "Local",
+      ROUTE == 14 ~ "Local",
+      ROUTE == 15 ~ "Local",
+      ROUTE == 24 ~ "Local",
+      ROUTE == 25 ~ "Local",
+      ROUTE == 32 ~ "Local",
+      ROUTE == 33 ~ "Local",
+      ROUTE == 34 ~ "Local",
+      ROUTE == 35 ~ "Local",
+      ROUTE == 36 ~ "Local",
+      ROUTE == 37 ~ "Local",
+      ROUTE == 50 ~ "Local",
+      ROUTE == 51 ~ "Local",
+      ROUTE == 52 ~ "Local",
+      ROUTE == 53 ~ "Local",
+      ROUTE == 54 ~ "Local",
+      ROUTE == 58 ~ "Local",
+      ROUTE == 61 ~ "Local",
+      ROUTE == 62 ~ "Local",
+      ROUTE == 63 ~ "Local",
+      ROUTE == 64 ~ "Local",
+      ROUTE == 65 ~ "Local",
+      ROUTE == 66 ~ "Local",
+      ROUTE == 67 ~ "Local",
+      ROUTE == 68 ~ "Local",
+      ROUTE == 69 ~ "Local",
+      ROUTE == 72 ~ "Local",
+      ROUTE == 74 ~ "Local",
+      ROUTE == 86 ~ "Local",
+      ROUTE == 4 ~ "Circulator",
+      ROUTE == 8 ~ "Circulator",
+      ROUTE == 5 ~ "Express",
+      ROUTE == 6 ~ "Express",
+      ROUTE == 26 ~ "Express",
+      ROUTE == 59 ~ "Express",
+      ROUTE == 76 ~ "Express",
+      ROUTE == 11 ~ "Feeder",
+      ROUTE == 12 ~ "Feeder",
+      ROUTE == 13 ~ "Feeder",
+      ROUTE == 16 ~ "Feeder",
+      ROUTE == 19 ~ "Feeder",
+      ROUTE == 43 ~ "Feeder",
+      ROUTE == 44 ~ "Feeder",
+      ROUTE == 46 ~ "Feeder",
+      ROUTE == 56 ~ "Feeder",
+      ROUTE == 60 ~ "Feeder",
+      ROUTE == 84 ~ "Feeder",
+      ROUTE == 89 ~ "Feeder",
+      ROUTE == 205 ~ "BRIO",
+      ROUTE == 206 ~ "BRIO",
+      ROUTE == 207 ~ "BRIO",
+      ROUTE == 208 ~ "BRIO",
+      ROUTE == 17 ~ "Other",
+      ROUTE == 20 ~ "Other",
+      ROUTE == 21 ~ "Circulator",
+      ROUTE == 41 ~ "Other",
+      ROUTE == 82 ~ "Other",
+      ROUTE == 87 ~ "Other",
+      ROUTE == 500 ~ "Streetcar"
+    )
+  )
+
+classified <- na.omit(classified)
+
+local <- classified[classified$type %in% "Local", ]
+circulator <- classified[classified$type %in% "Circulator", ]
+feeder <- classified[classified$type %in% "Feeder", ]
+express <- classified[classified$type %in% "Express", ]
+
+grid.arrange(ncol=2,
+localMap <- ggplot()+
+  geom_sf(data=el_paso, fill='lightgrey', color="black", size=20)+
+  geom_sf(data=local, color=c(palette6[2]), size=2)+
+  labs(title="Local")+
+  mapTheme,
+circulatorMap <- ggplot()+
+  geom_sf(data=el_paso, fill='lightgrey', color="black", size=20)+
+  geom_sf(data=circulator, color=c(palette6[3]), size=2)+
+  labs(title="Circulator")+
+  mapTheme,
+feederMap <- ggplot()+
+  geom_sf(data=el_paso, fill='lightgrey', color="black", size=20)+
+  geom_sf(data=feeder, color=c(palette6[4]), size=2)+
+  labs(title="Feeder")+
+  mapTheme,
+expressMap <- ggplot()+
+  geom_sf(data=el_paso, fill='lightgrey', color="black", size=20)+
+  geom_sf(data=express, color=c(palette6[5]), size=2)+
+  labs(title="Express")+
+  mapTheme
+)
+```
+
 
 We utilized road centerline data and bus route data obtained from El Paso's Open Data portal to understand the overall transit system's network. The current network is visually represented below, where roads were depicted in black and the bus network was overlain in orange. We can see that the network coverage extended significantly towards areas surrounding downtown El Paso. However, several neighborhoods located in the eastern part of the city remain unserved by the current transit system. This highlights a potential gap in the transit service coverage of the city and underscores the need for equity considerations in ensuring any El Paso resident has access to transit.
 
@@ -493,7 +632,7 @@ el_paso <- el_paso %>%
 
 acs.2020_EP <- st_intersection(el_paso, acs.2020)
 
-local_agg <- local %>%
+local_agg <- local1 %>%
   group_by(RT, TP, longitude, latitude) %>%
   summarize(total_ons = sum(Ons),
             total_offs = sum(Offs)) %>%
@@ -1489,15 +1628,46 @@ ncol=2)
 ## Spatial Effects
 
 ```{r spatial effects, warning=FALSE, message=FALSE, results=FALSE}
-ggplot()+
+library(dplyr)
+
+bays <- local_transit_bays %>%
+  mutate(Bay = ifelse(name == "BERT WILLIAMS DOWNTOWN SANTA FE TRANSIT CENTER", "Downtown",
+                      ifelse(name == "ARTURO TURY BENAVIDES CIELO VISTA TRANSIT CENTER", "Cielo Vista",
+                             ifelse(name == "UPPER EAST SIDE TRANSIT CENTER", "Upper East Side",
+                                    ifelse(name == "ROBERT E. MCKEE FIVE POINTS TRANSIT CENTER", "Five Points",
+                                           ifelse(name == "GLORY ROAD TRANSIT CENTER", "Glory Road",
+                                                  ifelse(name == "NESTOR A. VALENCIA MISSION VALLEY TRANSIT CENTER", "Mission Valley",
+                                                         ifelse(name == "ARVES E. JONES SR. TRANSIT CENTER AT NORTHGATE", "Northgate",
+                                                                ifelse(name == "AL JEFFERSON WESTSIDE TRANSIT CENTER", "Westside", NA))))))))) %>%
+  drop_na()  
+
+bays_st <- bays %>%
+  st_drop_geometry()
+
+bay1 <- ggplot(bays_st, aes(x = Bay)) +
+  geom_bar(fill=c(palette8)) +
+  labs(x = "Bay", y = "Count", title = "Observations of Column 'Bay'")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  scale_y_continuous(breaks = seq(0, 10, 2))+
+  plotTheme
+
+
+bay2 <- ggplot()+
   geom_sf(data=el_paso)+
-  geom_sf(data=local_transit_bays, aes(fill=name))+
-  scale_fill_manual(values=palette8)+
+  geom_sf(data=bays, aes(color=Bay), size=4)+
+  scale_color_manual(values=palette8)+
+  theme(legend.position = "right", 
+        legend.direction = "vertical")+
+  labs(title="Transit Centers",
+       subtitle = "El Paso, TX")+
+  guides(color = guide_legend(override.aes = list(fill = palette8)))+
   mapTheme
 
 bay_points <- local_transit_bays %>%
   dplyr::select("geometry") %>%
   mutate(type = "transit_bay")
+
+grid.arrange(ncol=2, bay1, bay2)
 ```
 
 
@@ -1505,34 +1675,34 @@ bay_points <- local_transit_bays %>%
 
 ```{r modeling package installs, include=FALSE}
 #Package installs -------------------------------------------------------------
-load.fun <- function(x) { 
-  x <- as.character(x) 
-  if(isTRUE(x %in% .packages(all.available=TRUE))) { 
-    eval(parse(text=paste("require(", x, ")", sep=""))) 
-    print(paste(c(x, " : already installed; requiring"), collapse=''))
-  } else { 
-    #update.packages()
-    print(paste(c(x, " : not installed; installing"), collapse=''))
-    eval(parse(text=paste("install.packages('", x, "')", sep=""))) 
-    print(paste(c(x, " : installed and requiring"), collapse=''))
-    eval(parse(text=paste("require(", x, ")", sep=""))) 
-  } 
-} 
+# load.fun <- function(x) { 
+#   x <- as.character(x) 
+#   if(isTRUE(x %in% .packages(all.available=TRUE))) { 
+#     eval(parse(text=paste("require(", x, ")", sep=""))) 
+#     print(paste(c(x, " : already installed; requiring"), collapse=''))
+#   } else { 
+#     #update.packages()
+#     print(paste(c(x, " : not installed; installing"), collapse=''))
+#     eval(parse(text=paste("install.packages('", x, "')", sep=""))) 
+#     print(paste(c(x, " : installed and requiring"), collapse=''))
+#     eval(parse(text=paste("require(", x, ")", sep=""))) 
+#   } 
+# } 
 
 ########### Required Packages ###########
-packages = c("bayesplot", "lme4","RcppEigen",
-             "tidyverse", "tidyr", "AmesHousing", "broom", "caret", "dials", "doParallel", "e1071", 
-             "earth",
-             "ggrepel", "glmnet", "ipred", "klaR", "kknn", "pROC", "rpart", "randomForest",
-             "sessioninfo", "tidymodels","ranger", "recipes", "workflows", "themis","xgboost",
-             "sf", "nngeo", "mapview")
-
-for(i in seq_along(packages)){
-  packge <- as.character(packages[i])
-  load.fun(packge)
-}
-
-session_info()
+# packages = c("bayesplot", "lme4","RcppEigen",
+#              "tidyverse", "tidyr", "AmesHousing", "broom", "caret", "dials", "doParallel", "e1071", 
+#              "earth",
+#              "ggrepel", "glmnet", "ipred", "klaR", "kknn", "pROC", "rpart", "randomForest",
+#              "sessioninfo", "tidymodels","ranger", "recipes", "workflows", "themis","xgboost",
+#              "sf", "nngeo", "mapview")
+# 
+# for(i in seq_along(packages)){
+#   packge <- as.character(packages[i])
+#   load.fun(packge)
+# }
+# 
+# session_info()
 
 #########################################
 ```
