@@ -79,6 +79,7 @@ library(FNN)
 library(poissonreg)
 library(vip)
 library(gt)
+library(corrr)
 #devtools::install_github("jamgreen/lehdr")
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
@@ -177,6 +178,10 @@ ft_bliss <- read_sf(paste(data_folder, "/Texas_Military_Boundaries.geojson", sep
 
 # OSM
 osm <- read_sf(paste(data_folder, "/export.geojson", sep = ''))
+
+# Local Transit Bays
+local_transit_bays <- read_sf(paste(data_folder, "/local_transit_bays.csv", sep = '')) %>%
+  st_as_sf(coords = c('lon', 'lat'), crs = 4269)
 ```
 
 ## Acknowledgement
@@ -189,20 +194,6 @@ Sun Metro is the transportation provider in the city of El Paso, Texas. Sun Metr
 
 El Paso is the sixth-largest city in Texas located at the far western tip of the state, just immediately north of Ciudad Juárez. The city is bounded by the Rio Grande River to the south, the Franklin Mountain Range to the north, and Fort Bliss Military Base to the northeast. The context map below shows the geographical constraints where the Franklin Mountains are represented in light green, Fort Bliss Military Base in dark green, and the Rio Grande River in light blue, overlain on top of population density of the city at a census tract level. As we can see, downtown El Paso is notched in between the mountains and river, with heavy sprawl toward the north and east.
 
-<superbigimage>
-```{r context map, warning=FALSE, message=FALSE, results=FALSE}
-plot <- ggplot() +
-  geom_sf(data=el_paso, fill="grey") +
-  geom_sf(data=rio, fill="skyblue", color="skyblue", size=500) +
-  geom_sf(data=franklin, fill="darkgreen", color="darkgreen", alpha=0.7) +
-  geom_sf(data=ft_bliss, fill="limegreen", color="limegreen", alpha=0.7) +
-  labs(title="El Paso, Texas",
-       subtitle="Context Map",
-       caption="City limits in grey \nRio Grande River in blue \nFranklin Mountains in dark green \nFort Bliss Military Reserve in lime green")+
-  mapTheme
-
-plot
-```
 </superbigimage>
 
 
@@ -398,17 +389,7 @@ We utilized road centerline data and bus route data obtained from El Paso's Open
 ```{r current network, warning=FALSE, message=FALSE, results=FALSE}
 ep_roads <- st_intersection(road_centerlines, el_paso)
 
-ggplot()+
-  geom_sf(data=el_paso,
-          fill="lightgrey",
-          color=NA)+
-  geom_sf(data=bus_routes,
-          alpha=0.9, 
-          color="#C96A52FF", 
-          size=1)+
-  labs(title="SunMetro Bus Network",
-       caption="Data: Open Data El Paso")+
-  mapTheme
+
 ```
 
 ## Analyzing route ridership
@@ -422,15 +403,7 @@ merged <- merge(transit_lines, RT_avg_sum_st, by.x = "route_short_name", by.y = 
 
 RT_avg_sum_st <- RT_avg_sum_st[order(-RT_avg_sum_st$total_ridership),]
 
-ggplot(RT_avg_sum_st, aes(y = total_ridership, x = reorder(factor(RT), -total_ridership), fill = type)) +
-  geom_bar(stat = "identity") +
-  xlab("Total Ridership") +
-  ylab("Route") +
-  scale_fill_manual(values = palette7, name="Type of Bus", expand=c(0.2, 0)) +
-  labs(title="Total Ridership by Route and Type",
-       caption="Data: El Paso Capital Improvements Department, 2022")+
-  plotTheme+
-  theme(axis.text.x = element_text(angle=90))
+
 ```
 
 ## Ridership Scatterplot
@@ -440,16 +413,7 @@ As the scatter plot indicates, there is a strong correlation between average on-
 ```{r scatterplot1, warning=FALSE, message=FALSE, results=FALSE}
 RT_stop_avg_st <- st_drop_geometry(RT_stop_avg)
 
-ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
-  geom_point() +
-  labs(x = "Average on-boarding", 
-       y = "Average off-boarding", 
-       title = "Scatterplot of on-boarding and off-boarding", 
-       subtitle="Average values grouped by route and stop information",
-       caption="Data: El Paso Capital Improvements Department, 2022")+
-  geom_smooth(method = lm, se=FALSE, colour = "#C96A52FF", size=1, )+
-  geom_abline(intercept=0, slope=1, color="#C96A52FF", alpha=0.3, size=1, style='dashed')+
-  plotTheme
+
 ```
 
 ## Ridership by Census Tract
@@ -496,15 +460,6 @@ agg_data2 <- left_join(agg_data, acs.2020_EP, by = "GEOID") %>%
   st_transform(crs=4269) %>%
   dplyr::select(c("total_ridership", "geometry"))
 
-ggplot()+ 
-  geom_sf(data = el_paso, fill="lightgrey", color="black", size=80)+
-  geom_sf(data = agg_data2, aes(fill = q5(total_ridership)), color=NA)+
-  scale_fill_manual(values = rev(palette5cont), 
-                     labels = (qBr(agg_data2, "total_ridership")),
-                    name="Quintile\nBreaks") +
-  labs(title="Total Local Ridership by Census Tract",
-       subtitle="El Paso, TX (2022)")+
-  mapTheme
 ```
 
 
@@ -513,32 +468,7 @@ ggplot()+
 
 We are building a latent bus transit demand prediction model. Thus, we engineered a variety of features that we hypothesized were correlative to bus transit demand. We pulled our features primarily from five main sources, tabulated below.
 
-```{r ftr eng kable, warning=FALSE, message=FALSE, results=TRUE}
-sources <- c(
-  "American Community Survey (2019)",
-  "National Walkability Index (2019)",
-  "Longitudinal Employer-Household Dynamics",
-  "Open Data El Paso",
-  "Open Street Map"
-)
 
-descriptions <- c(
-  "Provides demographic information to inform spatial distribution of population",
-  "Offers measures of amenity and place-based accessibility at the census block level",
-  "Provides employer/employee data to provide greater economic insight",
-  "Offers built environment and land use characteristics data",
-  "Measures distance information to various amenities"
-)
-
-table_ftrs <- list(
-  Sources = sources,
-  Description = descriptions
-)
-
-kable(table_ftrs, col.names = NULL) %>%
-  add_header_above(c("Sources" = 1, "Description" = 1)) %>%
-  kable_paper(full_width = FALSE)
-```
 
 ## American Community Survey (2020)
 
@@ -704,7 +634,7 @@ ep <- st_intersection(ep, el_paso)
 
 Four maps of the White, Hispanic/Latino, Black, and Asian populations are below. It appears that there is racial segregation, as census tracts with the greatest density of Black residents seem to have decreased amount of White and Latino residents. There also is a strip along the Rio Grande in the southeastern part of the city where there is an incredibly high density of Hispanic/Latino residents. A high density of Asian residents seem to live just northwest of downtown.
 
-```{r race distribution maps, warning=FALSE, message=FALSE, results=FALSE}
+```{r race distribution maps, warning=FALSE, message=FALSE, results=FALSE, eval=FALSE}
 grid.arrange(ncol=2,
              ggplot()+
                geom_sf(data=acs_ep, aes(fill=whitePopPct), color=NA)+
@@ -737,29 +667,13 @@ grid.arrange(ncol=2,
 
 Vacant households may contribute to ridership demand; if units are unoccupied, there is a decreased density of residents and thus less people who may need to utilize buses. There seems to be a relatively random spatial pattern on percentage of vacant housing units. It appears more densified areas such as downtown see higher rates of vacancy.
 
-```{r vacant HU pct, warning=FALSE, message=FALSE, results=FALSE}
-ggplot()+
-  geom_sf(data=acs_ep, aes(fill=vacantHUPct), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="% Vacancy")+
-  labs(title="Vacant Housing Units per square mile",
-       subtitle="El Paso, TX (2020)",
-       caption="Data: ACS")+
-  mapTheme
-```
+
 
 ### Median Household Income
 
 Household income is a significant factor in transit demand, particularly for lower income households who may rely more heavily on public transportation due to the cost of car ownership. Interestingly, there appears to be a spatial clustering of Hispanic/Latino residents in census tracts with the lowest median household income. On the other hand, census tracts around the University of Texas-El Paso in the northwest part of the city seem to have the highest median household income. These patterns of median household income show some rigidity, with noticeable clustering of income distribution within certain areas.
 
-```{r cen plot3, warning=FALSE, message=FALSE, results=FALSE}
-ggplot()+
-  geom_sf(data=acs_ep, aes(fill=medHHInc), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="$")+
-  labs(title="Median Household Income",
-       subtitle="El Paso, TX (2020)",
-       caption="Data: ACS, 2020")+
-  mapTheme
-```
+
 
 ## National Walkability Index (2019)
 
@@ -840,26 +754,7 @@ The nearest transit accessibility score is calculated as the distance (in meters
 
 For the purpose of visualization, census blocks that do not have a transit stop within them were removed from the data, as they were assigned a value of -99999. From the remaining blocks, the histogram shows a unimodal distribution with a peak around 400 meters, indicating that a transit stop is within 0.25 miles from the population-weighted centroid for the majority of census block groups. While this generally aligns with the metric of transit accessibility, which is often measured as a transit stop within 0.25 or 0.5 miles of home, it is challenging to determine if this is the most effective measure for transit accessibility given it does not look at data at the household level.
 
-```{r nearest transit, warning=FALSE, message=FALSE, results=FALSE}
-grid.arrange(ncol=2,
-ggplot(nwi_bg_st_NA, aes(x = nearestTransit)) +
-  geom_histogram(color = "black", fill = "#B8860B") +
-  labs(title = "Nearest Transit Stop Histogram",
-       subtitle = "El Paso, TX (Census Blocks)",
-       x = "Distance (meters)",
-       y = "Count",
-       caption = "Data: National Walkability Index (2019)")+
-  plotTheme,
-ggplot()+
-  geom_sf(data=el_paso, fill="lightgrey", color=NA)+
-  geom_sf(data=nwi_bg_NA, aes(fill=nearestTransit), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance\n(meters)")+
-  labs(title="Nearest Transit Stop Map",
-       subtitle="El Paso, TX (Census Blocks)",
-       caption="Areas in grey have no transit stops in block group")+
-  mapTheme
-)
-```
+
 
 ### Destination Accessibility
 
@@ -867,68 +762,15 @@ The destination accessibility metric is measured as jobs within 45-minute transi
 
 We can see where there is increased density of jobs (e.g. downtown, UTEP), the metric is higher.
 
-```{r destination accessibility, warning=FALSE, message=FALSE, results=FALSE}
-grid.arrange(ncol=2,
-ggplot(nwi_bg_st, aes(x = destinationAccessibility)) +
-  geom_histogram(color = "black", fill = "#B8860B") +
-  labs(title = "Destination Accessibility Histogram",
-       subtitle = "El Paso, TX (Census Blocks)",
-       x = "Density Score",
-       y = "Count",
-       caption = "Data: National Walkability Index (2019)")+
-  plotTheme,
-ggplot()+
-  geom_sf(data=el_paso, fill="lightgrey", color=NA)+
-  geom_sf(data=nwi_bg_NA, aes(fill=destinationAccessibility), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Density\nScore")+
-  labs(title="Destination Accessibility Map",
-       subtitle="El Paso, TX (Census Blocks)",
-       caption="Areas in grey have no transit stops in block group")+
-  mapTheme
-)
-```
 
 ### Jobs to Population Balance
 
 This metric is a measurement that captures the number of jobs relative to the population in a given area, providing insights into employment opportunities and population dynamics of the census block and the greater region.
 
-```{r jobs pop balance, warning=FALSE, message=FALSE, results=FALSE}
-grid.arrange(ncol=2,
-ggplot(nwi_bg_st, aes(x = jobsPopBalance)) +
-  geom_histogram(color = "black", fill = "#B8860B") +
-  labs(title = "Intersection Density Histogram",
-       subtitle = "El Paso, TX (Census Blocks)",
-       x = "Score",
-       y = "Count")+
-  plotTheme,
-ggplot()+
-  geom_sf(data=nwi_bg, aes(fill=jobsPopBalance), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Density\nScore")+
-  labs(title="Intersection Density Map",
-       subtitle="El Paso, TX (Census Blocks)")+
-  mapTheme
-)
-```
 
 ### Intersection Density (D3B)
 
-```{r intersection density dist, warning=FALSE, message=FALSE, results=FALSE}
-grid.arrange(ncol=2,
-ggplot(nwi_bg_st, aes(x = intersectionDensity)) +
-  geom_histogram(color = "black", fill = "#B8860B") +
-  labs(title = "Intersection Density Histogram",
-       subtitle = "El Paso, TX (Census Blocks)",
-       x = "Score",
-       y = "Count")+
-  plotTheme,
-ggplot()+
-  geom_sf(data=nwi_bg, aes(fill=intersectionDensity), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Density\nScore")+
-  labs(title="Intersection Density Map",
-       subtitle="El Paso, TX (Census Blocks)")+
-  mapTheme
-)
-```
+
 
 ## Longitudinal Employment-Household Data (LEHD)
 
@@ -1048,31 +890,7 @@ ep_work_census_st <- ep_work_census %>%
 We calculated the percentage of each monthly income bracket of the census tracts - which in LEHD are divided as making under $1250 per month, between $1251 and $3333 per month, or over $3334 per month.
 
 
-```{r income dist}
-grid.arrange(ncol=3,
-ggplot()+
-  geom_sf(data=ep_work_census, aes(fill=income1250LessPct*100), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
-  labs(title="Under $1250",
-       caption="Data: LEHD, 2019")+
-  mapTheme+
-  theme(legend.position = 'bottom'),
-ggplot()+
-  geom_sf(data=ep_work_census, aes(fill=income1251to3333Pct*100), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
-  labs(title="Between $1251 to $3333",
-       caption="Data: LEHD, 2019")+
-  mapTheme+
-  theme(legend.position = 'bottom'),
-ggplot()+
-  geom_sf(data=ep_work_census, aes(fill=income3333OverPct*100), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
-  labs(title="Over $3334",
-       caption="Data: LEHD, 2019")+
-  mapTheme+
-  theme(legend.position = 'bottom')
-)
-```
+
 
 ```{r bar chart income dist,warning=FALSE, message=FALSE, results=FALSE}
 epworkincome <- ep_work_census_st[, c("GEOID", "income1250LessPct", "income1251to3333Pct", "income3333OverPct")]
@@ -1080,13 +898,6 @@ epworkincome <- ep_work_census_st[, c("GEOID", "income1250LessPct", "income1251t
 epworktidy <- epworkincome %>%
   gather(key = "IncomeLevel", value = "Income", -GEOID)
 
-ggplot(epworktidy, aes(x = Income, y = GEOID, fill = IncomeLevel)) +
-  geom_bar(stat = "identity", position = "stack", width=2) +
-  scale_fill_manual(values=c(palette6[4:6]),
-                    labels=c("< 1250", "Between 1251 and 3334", " > 3334"))+
-  labs(y = "Census Tract", x = "Income", fill = "Monthly \nIncome ($)") +
-  plotTheme+
-  theme(axis.text.y = element_blank())
 ```
 
 
@@ -1105,15 +916,7 @@ schools <- schools %>%
   dplyr::filter(TYPE_ != "ADMIN") %>%
   dplyr::filter(TYPE_ != "FACILITIES")
 
-ggplot() +
-  geom_sf(data = el_paso, fill = "grey", color = NA) +
-  geom_sf(data = schools, aes(color = TYPE_), size = 2, alpha=0.85) +
-  scale_color_manual(values = palette6, name = "Type") +
-  guides(color = guide_legend(override.aes = list(shape = 22, size = 5, fill=palette6))) +
-  labs(title="Schools",
-       subtitle="El Paso Independent School District",
-       caption="Source: Open Data El Paso, 2023")+
-  mapTheme
+
 ```
 
 ### Parks
@@ -1122,16 +925,6 @@ ggplot() +
 parks <- parks %>%
   dplyr::filter(CATEGORY %in% c("City Park", "Open Space", "Trail", "Trailhead"))
 
-ggplot() +
-  geom_sf(data = el_paso, fill = "grey", color = NA) +
-  geom_sf(data = parks, aes(fill = CATEGORY, color = CATEGORY), size = 2, alpha=0.85) +
-  scale_fill_manual(values = palette6[1:4], name = "Type") +
-  scale_color_manual(values = palette6[1:4], name = "Type") +
-  guides(color = guide_legend(override.aes = list(shape = 22, size = 5, fill=palette6[1:4], color=palette6[1:4]))) +
-  labs(title="Parks",
-       subtitle="El Paso, TX",
-       caption="Source: Open Data El Paso, 2023")+
-  mapTheme
 ```
 
 ### Road Infrastructure
@@ -1161,16 +954,7 @@ class_count <- table(roads_sf$CLASS)
 
 class_count_df <- data.frame(CLASS = names(class_count), Count = as.vector(class_count))
 
-ggplot(class_count_df, aes(x = CLASS, y = Count, fill = CLASS)) +
-  geom_col() +
-  scale_fill_manual(values=c(palette6),
-                    name='Road Class')+
-  labs(title = "Road Classifications",
-       subtitle = "El Paso, TX",
-       caption = "Data: Open Data El Paso, 2023",
-       x = "Class",
-       y = "Count") +
-  plotTheme
+
 ```
 
 ```{r major roads map, warning=FALSE, message=FALSE, results=FALSE}
@@ -1180,15 +964,7 @@ major <- roads %>%
 
 majorEP <- st_intersection(el_paso, major)
 
-ggplot()+
-  geom_sf(data = el_paso, fill = "grey", color = NA) +
-  geom_sf(data = majorEP, aes(fill=CLASS, color=CLASS), size = 4, alpha=0.85) +
-  scale_fill_manual(values=palette1, name='Road Class')+
-  scale_color_manual(values=palette1, name='Road Class')+
-  labs(title="Major Roads",
-       subtitle="El Paso, TX",
-       caption="Data: Open Data El Paso, 2023")+
-  mapTheme
+
 ```
 
 ## Open Street Map
@@ -1413,14 +1189,6 @@ osm_points <- rbind(
 osm_points_st <- osm_points %>%
   st_drop_geometry()
 
-ggplot(osm_points_st, aes(y = type)) +
-  geom_bar(fill = c(palette1)) +
-  ggtitle("Count of Each Open Street Map Feature") +
-  labs(subtitle="El Paso, TX",
-       caption="Data: Open Street Map") +
-  xlab("Count") +
-  ylab("Type") +
-  plotTheme
 ```
 
 Below is a point-level distribution of each feature, separated into four maps with shared characteristics.
@@ -1431,32 +1199,6 @@ entertainment <- rbind(worship_points, cinema_points, theatre_points)
 shop <- rbind(department_store_points, supermarket_points, mall_points)
 food <- rbind(restaurant_points, cafe_points, bar_points)
 
-grid.arrange(
-ggplot()+
-  geom_sf(data=el_paso, fill="grey")+
-  geom_sf(data=health, aes(color=type))+
-  scale_color_manual(values=c(palette6[3:5]), name="Type")+
-  labs(title="Healthcare Facilities")+
-  mapTheme,
-ggplot()+
-  geom_sf(data=el_paso, fill="grey")+
-  geom_sf(data=entertainment, aes(color=type))+
-  scale_color_manual(values=c(palette6[3:5]), name="Type")+
-  labs(title="Entertainment Places")+
-  mapTheme,
-ggplot()+
-  geom_sf(data=el_paso, fill="grey")+
-  geom_sf(data=shop, aes(color=type))+
-  scale_color_manual(values=c(palette6[3:5]), name="Type")+
-  labs(title="Shopping Centers")+
-  mapTheme,
-ggplot()+
-  geom_sf(data=el_paso, fill="grey")+
-  geom_sf(data=food, aes(color=type))+
-  scale_color_manual(values=c(palette6[3:5]), name="Type")+
-  labs(title="Eateries")+
-  mapTheme,
-ncol=2)
 ```
 
 # Modeling
@@ -1631,9 +1373,10 @@ nwi_hex <- hex %>%
   full_join(., hex) %>% 
   st_sf()
 
-ggplot()+
-  geom_sf(data = hex)+
-  geom_sf(data = nwi_bg, fill = NA)
+
+```
+
+```{r final hex begins}
 
 final_hex <- left_join(ridership_net_local, st_drop_geometry(census_lehd_hex), by = "uniqueID") %>% 
   left_join(st_drop_geometry(nwi_hex), by = "uniqueID") %>% 
@@ -1808,10 +1551,33 @@ busbaysnet <- hex %>% st_join(local_transit_bays %>% mutate(stop1 = 1)) %>% muta
 
 final_hex <- merge(final_hex, busstopnet %>% st_drop_geometry(), by = "uniqueID")
 
-final_hex <- merge(final_hex, busbaysnet %>% st_drop_geometry(), by = "uniqueID")
+final_hex <- merge(final_hex, busbaysnet %>% st_drop_geometry(), by = "uniqueID") 
 
-#st_write(final_hex, paste(data_folder,'/final_hex1.geojson', sep = ''), append = F)
+final_hex <- final_hex %>% dplyr::select(-contains('CF')) 
+
+final_hex <- final_hex %>% filter(!uniqueID %in% c(188, 365))
+#$mega_bay <- ifelse(final_hex$uniqueID %in% c(188, 365),1,0)
+
+#trying to get spatial smoothing
+# final_hex$lon <- st_coordinates(final_hex)[,1] %>% c()
+# final_hex$lat <- st_coordinates(final_hex)[,2]
+
+
+#make variable for mega_bays
+
+
 ```
+
+### coor plot 
+```{r}
+
+# final_hex %>% st_drop_geometry() %>% 
+# #select_loc(1:50) %>% 
+#   correlate() %>% 
+#   autoplot() +
+#   geom_text(aes(label = round(r,digits=2)),size = 2)
+```
+
 
 
 ## Modeling
@@ -1828,7 +1594,7 @@ input <- final_hex  %>%
                        replace = TRUE) )
 
 ### Initial Split for Training and Test
-data_split <- initial_split(input, strata = "ridership", prop = 0.75)
+data_split <- initial_split(input, strata = "ridership", prop = 0.75, group = "mega_bay")
 ep_train <- training(data_split)
 ep_test  <- testing(data_split)
 
@@ -1850,14 +1616,18 @@ model_rec <- recipe(ridership ~ ., data = ep_train) %>%
   update_role(uniqueID, new_role = "uniqueID") %>%
   step_log(ridership, skip = TRUE, offset = 1) %>%
   step_center(all_predictors(), -ridership) %>%
-  step_scale(all_predictors(), -ridership)
+  step_scale(all_predictors(), -ridership) 
 
+#%>%  step_dummy(mega_bay)
 
+# %>% step_ns(lat, lon, options = list(df = 4))
+
+#tidy model binary
 
   #step_ns(Latitude, Longitude, options = list(df = 2))
 
 # See the data after all transformations
-glimpse(model_rec %>% prep() %>% juice())
+#glimpse(model_rec %>% prep() %>% juice())
 
 rf_plan <- rand_forest() %>%
   set_args(mtry  = tune()) %>%
@@ -1869,7 +1639,7 @@ rf_plan <- rand_forest() %>%
 XGB_plan <- boost_tree() %>%
   set_args(mtry  = tune()) %>%
   set_args(min_n = tune()) %>%
-  set_args(trees = 100) %>% 
+  set_args(trees = 500) %>% 
   set_engine("xgboost") %>% 
   set_mode("regression")
 
@@ -1891,12 +1661,20 @@ xgb_wf <-
   workflow() %>% 
   add_recipe(model_rec) %>% 
   add_model(XGB_plan)
+
+control <- control_resamples(save_pred = TRUE, verbose = TRUE)
+metrics <- metric_set(rmse, rsq, mape, smape, mae)
 ```
+
 
 ```{r results='hide'}
 # fit model to workflow and calculate metrics
-control <- control_resamples(save_pred = TRUE, verbose = TRUE)
-metrics <- metric_set(rmse, rsq, mape, smape, mae)
+
+
+all_cores <- parallel::detectCores(logical = FALSE)
+
+cl <- makePSOCKcluster(all_cores)
+registerDoParallel(cl)
 
 
 rf_tuned <- rf_wf %>%
@@ -1913,16 +1691,13 @@ xgb_tuned <- xgb_wf %>%
                   control   = control,
                   metrics   = metrics)
 
-## metrics across grid
-# autoplot(pzinf_tuned)
-# collect_metrics(x_tuned)
 ```
 
 ```{r }
 ## 'Best' by some metric and margin
 
-rf_best_params     <- select_best(rf_tuned, metric = "rmse"    )
-xgb_best_params    <- select_best(xgb_tuned, metric = "rmse"   )
+rf_best_params     <- select_best(rf_tuned, metric = "rmse")
+xgb_best_params    <- select_best(xgb_tuned, metric = "rmse")
 
 ## Final workflow
 rf_best_wf     <- finalize_workflow(rf_wf, rf_best_params)
@@ -1930,7 +1705,7 @@ xgb_best_wf    <- finalize_workflow(xgb_wf, xgb_best_params)
 
 ```
 
-```{r }
+```{r results='hide', message=FALSE}
 
 # last_fit() emulates the process where, after determining the best model, the final fit on the entire training set is needed and is then evaluated on the test set.
 
@@ -1962,20 +1737,19 @@ output_rf <- output_rf  %>%
 
 output_rf_sf <- left_join(output_rf, hex) %>% st_sf()
 
-ggplot(output_rf_sf)+
+p1<-ggplot(output_rf_sf)+
   geom_sf(aes(fill = error), color =NA)
 
-rf_mae <- sum(abs(output_rf$error))/nrow(output_rf)
-
-```
-
-```{r}
 
 
-full_fit_rf %>% 
+
+p2<-full_fit_rf %>% 
   extract_fit_parsnip() %>% 
   vip(num_features = 30)
+grid.arrange(p1,p2, ncol = 2)
 ```
+
+
 
 ```{r}
 
@@ -1984,180 +1758,48 @@ full_fit_xgb <-xgb_best_wf %>% fit(input)
 
 output_xgb <- input
 
-output_xgb$pred <- predict(full_fit_xgb, new_data = input) %>% exp()
+output_xgb$pred <- predict(full_fit_xgb, new_data = input) %>% exp() 
 
 output_xgb <- output_xgb  %>% 
-  mutate(error = pred$.pred - ridership,
+  mutate(prediction= pred$.pred,
+         error = pred$.pred - ridership,
          uniqueID = as.character(uniqueID))
 
 
 output_xgb_sf <- left_join(output_xgb, hex) %>% st_sf()
 
-ggplot(output_xgb_sf)+
+p1<-ggplot(output_xgb_sf)+
   geom_sf(aes(fill = error), color =NA)
 
-```
 
-```{r}
-full_fit_xgb %>% 
+p2<-full_fit_xgb %>% 
   extract_fit_parsnip() %>% 
   vip(num_features = 30)
 
-xgb_mae <- sum(abs(output_xgb$error))/nrow(output_xgb)
+grid.arrange(ncol = 2, p1,p2)
+
 
 ```
 
+
+
 ```{r}
+xgb_mae <- sum(abs(output_xgb$error))/nrow(output_xgb)
+
+
+rf_mae <- sum(abs(output_rf$error))/nrow(output_rf)
+
 models_mae <- data.frame(model = c("Random Forest", "XG Boost"),
                          mae = c(rf_mae, xgb_mae))
 
 models_mae %>% gt()
 ```
 
-
-
-```{r modeling pt 3}
-##########################################################
-# This script follows after 2_Regression_models_Geo.R
-##########################################################
-
-# Pull best hyperparam preds from out-of-fold predictions
-lm_best_OOF_preds <- collect_predictions(lm_tuned) 
-
-glmnet_best_OOF_preds <- collect_predictions(glmnet_tuned) %>% 
-  filter(penalty  == glmnet_best_params$penalty[1] & mixture == glmnet_best_params$mixture[1])
-
-# OOF prediction
-rf_best_OOF_preds <- collect_predictions(rf_tuned) %>% 
-  filter(mtry  == rf_best_params$mtry[1] & min_n == rf_best_params$min_n[1])
-
-xgb_best_OOF_preds <- collect_predictions(xgb_tuned) %>% 
-  filter(mtry  == xgb_best_params$mtry[1] & min_n == xgb_best_params$min_n[1])
-
-# collect validation set predictions from last_fit model
-lm_val_pred_geo     <- collect_predictions(lm_val_fit_geo)
-glmnet_val_pred_geo <- collect_predictions(glmnet_val_fit_geo)
-rf_val_pred_geo     <- collect_predictions(rf_val_fit_geo)
-xgb_val_pred_geo    <- collect_predictions(xgb_val_fit_geo)
-
-
-# Aggregate OOF predictions (they do not overlap with Validation prediction set)
-OOF_preds <- rbind(data.frame(dplyr::select(lm_best_OOF_preds, .pred, ridership), model = "lm"),
-                   data.frame(dplyr::select(glmnet_best_OOF_preds, .pred, ridership), model = "glmnet"),
-                   data.frame(dplyr::select(rf_best_OOF_preds, .pred, ridership), model = "rf"),
-                   data.frame(dplyr::select(xgb_best_OOF_preds, .pred, ridership), model = "xgb")) %>% 
-  group_by(model) %>% 
-  mutate(ridership = ridership,
-         RMSE = yardstick::rmse_vec(ridership, .pred),
-         MAE  = yardstick::mae_vec(ridership, .pred),
-         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
-  ungroup() %>% 
-  mutate(model = factor(model, levels=c("lm","glmnet","rf","xgb")))
-
-# average error for each model
-ggplot(data = OOF_preds %>% 
-         dplyr::select(model, MAPE) %>% 
-         distinct() , 
-       aes(x = model, y = MAPE, group = 1)) +
-  geom_path(color = "red") +
-  geom_label(aes(label = paste0(round(MAPE,1),"%"))) +
-  theme_bw()
-
-# OOF predicted versus actual
-ggplot(OOF_preds, aes(x = ridership, y = .pred, group = model)) +
-  geom_point(alpha = 0.3) +
-  geom_abline(linetype = "dashed", color = "red") +
-  geom_smooth(method = "lm", color = "blue") +
-  coord_equal() +
-  facet_wrap(~model, nrow = 2) +
-  theme_bw()
-
-
-# Aggregate predictions from Validation set
-val_preds <- rbind(data.frame(lm_val_pred_geo, model = "lm"),
-                   data.frame(glmnet_val_pred_geo, model = "glmnet"),
-                   data.frame(rf_val_pred_geo, model = "rf"),
-                   data.frame(xgb_val_pred_geo, model = "xgb")) %>% 
-  left_join(., input %>% dplyr::select(uniqueID) %>% 
-              rowid_to_column(var = ".row"), 
-            by = ".row") %>% 
-  group_by(model) %>%
-  mutate(ridership = ridership,
-         RMSE = yardstick::rmse_vec(ridership, .pred),
-         MAE  = yardstick::mae_vec(ridership, .pred),
-         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
-  ungroup() %>% 
-  mutate(model = factor(model, levels=c("lm","glmnet","rf","xgb")))
-
-# plot MAPE by model type
-ggplot(data = val_preds %>% 
-         dplyr::select(model, MAPE) %>% 
-         distinct() , 
-       aes(x = model, y = MAPE, group = 1)) +
-  geom_path(color = "red") +
-  geom_label(aes(label = paste0(round(MAPE,1),"%"))) +
-  theme_bw()
-
-# Validation Predicted vs. actual
-ggplot(val_preds, aes(x = ridership, y = .pred, group = model)) +
-  geom_point(alpha = 0.3) +
-  geom_abline(linetype = "dashed", color = "red") +
-  geom_smooth(method = "lm", color = "blue") +
-  coord_equal() +
-  facet_wrap(~model, nrow = 2) +
-  theme_bw()
-
-# join test data back to make spatial
-val_pred_sf <- val_preds %>% 
-  group_by(model) %>% 
-  rowwise() %>% 
-  mutate(RMSE = yardstick::rmse_vec(ridership, .pred),
-         MAE  = yardstick::mae_vec(ridership, .pred),
-         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
-  st_as_sf(., coords = c("Longitude", "Latitude"),
-           remove = FALSE,
-           crs = 4326)
-
-# map errors by point
-mapview(filter(val_pred_sf, model == "rf"), zcol = "MAPE")
-
-# aggregate val error to Neighborhood 
-val_MAPE_by_hood <- val_preds %>% 
-  group_by(Neighborhood, model) %>% 
-  summarise(RMSE = yardstick::rmse_vec(ridership, .pred),
-         MAE  = yardstick::mae_vec(ridership, .pred),
-         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
-  ungroup() 
-
-# plot MAPE by Hood
-ggplot(val_MAPE_by_hood, aes(x = reorder(Neighborhood, MAPE), y = MAPE)) +
-  geom_bar(stat = "identity") +
-  scale_y_continuous(breaks = seq(0,10,1)) +
-  theme_bw() +
-  theme(
-    axis.text.x = element_text(angle = -45, hjust = 0)
-  )
-
-## Fit and Extract final model
-## Final fit on all data, then extract model
-full_fit_lm     <- lm_best_wf %>% fit(ames)
-full_fit_glmnet <- glmnet_best_wf %>% fit(ames)
-full_fit_rf     <- rf_best_wf %>% fit(input)
-full_fit_xgb    <- xgb_best_wf %>% fit(ames)
-
-# #1 predicting while staying in tidymodels
-predict(full_fit_rf, new_data = ames[3,]) %>% 
-  mutate(.pred_original = exp(.pred))
-
-# #2 extract final model object
-lm_full_mod     <- full_fit_lm$fit$fit$fit
-glmnet_full_mod <- full_fit_glmnet$fit$fit$fit
-rf_full_mod     <- full_fit_rf$fit$fit$fit
-xgb_full_mod    <- full_fit_xgb$fit$fit$fit
-
-# predicting on extracted model object
-MY_DATA_juiced <- prep(MY_DATA) %>% bake() %>% juice()
-predict(rf_full_mod, new_data = MY_DATA_juiced)
+```{r export hex with prediction}
+output_xgb_sf <- output_xgb_sf 
+st_write(output_xgb_sf, 'final_hex2.geojson', overwrite = T, append = F)
 ```
+
+## validating models
 
 
