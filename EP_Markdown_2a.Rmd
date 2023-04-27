@@ -534,11 +534,15 @@ acs_ep <- acs_ep %>%
     bachelorDeg = B06009_005E,
     professionalDeg = B06009_006E,
     disability = B10052_002E) %>%
-  mutate(area_sqmile = st_area(geometry)/2590000) %>%  
-  st_as_sf(crs = 4269) %>%
-  mutate_at(vars(-dontdiv), funs(as.numeric(./area_sqmile)))
+  dplyr::select(-c("B01001_001M", "B01001I_001M", "B02001_002M", "B02001_003M", "B02001_004M", "B02001_005M", "B02001_006M", "B02001_007M", "B02001_008M", "B19013_001M", "B25001_001M", "B25002_002M", "B25024_001M", "B25044_001M", "B28005_001M", "B28010_001M","B10052_002M", "B06009_002M", "B06009_003M", "B06009_004M", "B06009_005M", "B06009_006M"))
 
-acs_ep <- acs_ep %>%
+
+# %>%
+#   mutate(area_sqmile = st_area(geometry)/2590000) %>%  
+#   st_as_sf(crs = 4269) %>%
+#   mutate_at(vars(-dontdiv), funs(as.numeric(./area_sqmile)))
+# 
+acs_ep1 <- acs_ep %>%
   mutate(
     whitePopPct = (whitePop/totalPop)*100,
     hlPopPct = (hlPop/totalPop)*100,
@@ -548,8 +552,6 @@ acs_ep <- acs_ep %>%
     vacantHUPct = ((totalHU-occupiedHU)/totalHU)*100
   )
 
-acs_ep <- acs_ep %>%
-  dplyr::select(-c("B01001_001M", "B01001I_001M", "B02001_002M", "B02001_003M", "B02001_004M", "B02001_005M", "B02001_006M", "B02001_007M", "B02001_008M", "B19013_001M", "B25001_001M", "B25002_002M", "B25024_001M", "B25044_001M", "B28005_001M", "B28010_001M","B10052_002M", "B06009_002M", "B06009_003M", "B06009_004M", "B06009_005M", "B06009_006M"))
 
 acs_ep <- na.omit(acs_ep)
 
@@ -557,78 +559,6 @@ st_crs(acs_ep) <- st_crs(el_paso)
 acs_ep <- st_intersection(acs_ep, el_paso)
 ```
 
-```{r census plot 1, warning=FALSE, message=FALSE, results=FALSE}
-censusvarsEP <- c(
-  "B01001_001E", # ACS total Pop estimate
-  "B01001I_001E", # Population - Hispanic or Latino 
-  "B02001_002E", # Population - White alone
-  "B02001_003E", # Population - Black or African American alone
-  "B02001_004E", # Population - American Indian and Alaska Native alone
-  "B02001_005E", # Population - Asian alone
-  "B02001_006E", # Population - Native Hawaiian and Other Pacific Islander alone
-  "B02001_007E", # Population - Some other race alone
-  "B02001_008E", # Population - Two or more races
-  "B19013_001E", # Median household income in the past 12 months (in 2019 inflation-adjusted dollars)
-  "B25001_001E", # Total housing units
-  "B25002_002E", # Occupancy status - Occupied housing units
-  "B25024_001E", # Gross rent as a percentage of household income in the past 12 months
-  "B25044_001E", # Vehicles available
-  "B28005_001E", # Means of transportation to work by age
-  "B28010_001E", # Commuting time to work (in minutes)
-  "B10052_002E", # Disability
-  "B06009_002E", # Less than high school
-  "B06009_003E", # High School
-  "B06009_004E", # Associates or equivalent
-  "B06009_005E", # Bachelors
-  "B06009_006E" # Graduate or prof. degree
-)
-
-ep <- get_acs(geography = "tract",
-              year = 2020, 
-              variables = censusvarsEP, 
-              geometry = T,
-              state = "TX", 
-              county = "El Paso", 
-              output = "wide") 
-
-ep <- ep %>%
-  rename(
-    totalPop = B01001_001E, 
-    hlPop = B01001I_001E, 
-    whitePop = B02001_002E, 
-    blackPop = B02001_003E,
-    aiPop = B02001_004E,
-    asianPop = B02001_005E,
-    nhPop = B02001_006E,
-    otherRacePop = B02001_007E,
-    twoPlusRacePop = B02001_008E,
-    medHHInc = B19013_001E,
-    totalHU = B25001_001E, 
-    occupiedHU = B25002_002E, 
-    grossRentPerInc = B25024_001E, 
-    transByAge = B28005_001E,
-    commuteToWork = B28010_001E,
-    lessThanHS = B06009_002E,
-    highSchool = B06009_003E,
-    associatesDeg = B06009_004E,
-    bachelorDeg = B06009_005E,
-    professionalDeg = B06009_006E,
-    disability = B10052_002E)
-
-ep <- ep %>%
-  mutate(
-    whitePopPct = (whitePop/totalPop)*100,
-    hlPopPct = (hlPop/totalPop)*100,
-    asianPopPct = (asianPop/totalPop)*100,
-    blackPopPct = (blackPop/totalPop)*100,
-    occupiedHUPct = (occupiedHU/totalHU)*100,
-    vacantHUPct = ((totalHU-occupiedHU)/totalHU)*100
-  )
-
-st_crs(ep) <- st_crs(el_paso)
-
-ep <- st_intersection(ep, el_paso)
-```
 
 ### Racial Distribution in El Paso
 
@@ -637,25 +567,25 @@ Four maps of the White, Hispanic/Latino, Black, and Asian populations are below.
 ```{r race distribution maps, warning=FALSE, message=FALSE, results=FALSE, eval=FALSE}
 grid.arrange(ncol=2,
              ggplot()+
-               geom_sf(data=acs_ep, aes(fill=whitePopPct), color=NA)+
+               geom_sf(data=acs_ep1, aes(fill=whitePopPct), color=NA)+
                scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
                labs(title="% White population",
                     caption="Data: ACS, 2020")+
                mapTheme,
              ggplot()+
-               geom_sf(data=acs_ep, aes(fill=hlPopPct), color=NA)+
+               geom_sf(data=acs_ep1, aes(fill=hlPopPct), color=NA)+
                scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
                labs(title="% Hispanic/Latino population",
                     caption="Data: ACS, 2020")+
                mapTheme,
              ggplot()+
-               geom_sf(data=acs_ep, aes(fill=blackPopPct), color=NA)+
+               geom_sf(data=acs_ep1, aes(fill=blackPopPct), color=NA)+
                scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
                labs(title="% Black population",
                     caption="Data: ACS, 2020")+
                mapTheme,
              ggplot()+
-               geom_sf(data=acs_ep, aes(fill=asianPopPct), color=NA)+
+               geom_sf(data=acs_ep1, aes(fill=asianPopPct), color=NA)+
                scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
                labs(title="% Asian population",
                     caption="Data: ACS, 2020")+
@@ -688,7 +618,6 @@ nwi <- read_csv(paste(data_folder, "/nwi2019.csv", sep = '')) %>%
                   "GEOID10",
                   "TRACTCE",
                   "BLKGRPCE",
-                  "TotPop",
                   "CountHU", # number of housing units
                   "P_WrkAge", # percent working age pop. (18-64)
                   "HH", # households
@@ -712,7 +641,6 @@ blocks <-read_sf(paste(data_folder, "/tl_2019_48_bg.shp", sep = '')) %>%
 
 nwi_bg <- left_join(nwi, blocks, by = "tractblock") %>% st_sf() %>%
   rename(
-    totalPop = TotPop,
     housingUnits = CountHU,
     pctWorkingAge = P_WrkAge,
     housingUnits = CountHU,
@@ -876,13 +804,15 @@ tx_work <- tx_work %>%
     femaleWorkPct = (female_work/total_jobs)
   )
 
-ep_work_census <- left_join(acs_ep, tx_work, by=c('GEOID' = 'w_tract'))
-
+# <- left_join(acs_ep, tx_work, by=c('GEOID' = 'w_tract'))
+ep_work_census <- acs_ep
 #ep_work_census <- ep_work_census %>%
  # select(-starts_with("CF"))
 
-ep_work_census_st <- ep_work_census %>%
-  st_drop_geometry()
+ep_work_census_st <- ep_work_census %>% 
+  dplyr::select(-c("GEOID", "NAME", "OBJECTID", "NAME.1", "GlobalID", "Shape_Length", "Shape_Area","B25044_001E"
+                 ))
+
 ```
 
 ### Income Distribution of Jobs - Monthly Income
@@ -892,13 +822,6 @@ We calculated the percentage of each monthly income bracket of the census tracts
 
 
 
-```{r bar chart income dist,warning=FALSE, message=FALSE, results=FALSE}
-epworkincome <- ep_work_census_st[, c("GEOID", "income1250LessPct", "income1251to3333Pct", "income3333OverPct")]
-
-epworktidy <- epworkincome %>%
-  gather(key = "IncomeLevel", value = "Income", -GEOID)
-
-```
 
 
 
@@ -1348,19 +1271,23 @@ plot_grid(p1b,p1a,p1c, ncol=3)
 
 
 ```{r hex of cen nwi and lehd, warning=FALSE, message=FALSE, results=FALSE}
-ep_work_census <- ep_work_census %>%
-  dplyr::select(-c("GEOID", "NAME", "OBJECTID", "NAME.1", "GlobalID", "Shape_Length", "Shape_Area",
-                   "year", "state", "age_29_or_younger", "age_30_to_54", "age_55_or_older", "monthly_income_1250_or_less", "monthly_income_1251_to_3333", "monthly_income_3334_or_more", "agriculture", "mining", "utilities", "construction", "manufacturing", "wholesaleTrade", "retailTrade", "transportationWarehousing", "informationTech", "financeInsurance", "realEstate", "techServices", "management", "wasteRemediation", "educational", "healthcareSocial", "artsEntertainmentRec", "foodServices", "otherJobs", "publicAdmin", "white_work", "black_work", "native_american_work", "asian_work", "pacific_work", "mixed_race_work", "not_hispanic_work", "hispanic_work", "underHS_work", "HS_work", "associate_work", "bachProfessional_work", "male_work", "female_work"))
+# ep_work_census <- ep_work_census %>%
+#   dplyr::select(-c("GEOID", "NAME", "OBJECTID", "NAME.1", "GlobalID", "Shape_Length", "Shape_Area",
+#                    "year", "state", "age_29_or_younger", "age_30_to_54", "age_55_or_older", "monthly_income_1250_or_less", "monthly_income_1251_to_3333", "monthly_income_3334_or_more", "agriculture", "mining", "utilities", "construction", "manufacturing", "wholesaleTrade", "retailTrade", "transportationWarehousing", "informationTech", "financeInsurance", "realEstate", "techServices", "management", "wasteRemediation", "educational", "healthcareSocial", "artsEntertainmentRec", "foodServices", "otherJobs", "publicAdmin", "white_work", "black_work", "native_american_work", "asian_work", "pacific_work", "mixed_race_work", "not_hispanic_work", "hispanic_work", "underHS_work", "HS_work", "associate_work", "bachProfessional_work", "male_work", "female_work"))
+# 
+# ep_work_census <- ep_work_census %>%
+#   st_transform(crs=4269)
 
-ep_work_census <- ep_work_census %>%
-  st_transform(crs=4269)
+census_lehd_hex <- st_interpolate_aw(ep_work_census_st, hex, extensive = T) %>%
+  mutate(uniqueID = rownames(.))
+
   
-census_lehd_hex <- hex %>% 
-  st_centroid() %>% 
-  st_join(ep_work_census, join=st_within) %>% 
-  st_drop_geometry() %>% 
-  full_join(., hex) %>% 
-  st_sf()
+# census_lehd_hex <- hex %>% 
+#   st_centroid() %>% 
+#   st_join(ep_work_census, join=st_within) %>% 
+#   st_drop_geometry() %>% 
+#   full_join(., hex) %>% 
+#   st_sf()
 
 nwi_bg <- nwi_bg %>%
   st_transform(crs=4269)
@@ -1382,14 +1309,14 @@ final_hex <- left_join(ridership_net_local, st_drop_geometry(census_lehd_hex), b
   left_join(st_drop_geometry(nwi_hex), by = "uniqueID") %>% 
   replace(is.na(.), 0)
 
-final_hex <- final_hex %>%
-  st_sf() %>%
-  dplyr::select(-c("area_sqmile"))
+# final_hex <- final_hex %>%
+#   st_sf() %>%
+#   dplyr::select(-c("area_sqmile"))
 
 final_hex <- final_hex %>%
   mutate(nearestTransit = ifelse(nearestTransit == -99999.00, -1, nearestTransit),
-         destinationAccessibility = ifelse(destinationAccessibility == -99999, 0, destinationAccessibility)) %>%
-  dplyr::select(-c("B25044_001E"))
+         destinationAccessibility = ifelse(destinationAccessibility == -99999, 0, destinationAccessibility)) 
+# %>%  dplyr::select(-c("B25044_001E"))
 
 final_hex$uniqueID <- as.numeric(final_hex$uniqueID)
 ```
@@ -1543,7 +1470,7 @@ vars_net <- vars_net %>%
 final_hex <- merge(final_hex, vars_net, by = "uniqueID")
 ```
 
-```{r}
+```{r results='hide', message=FALSE}
 # add features for # of bus stops in hex, # of transit bay bus stops
 busstopnet <- hex %>% st_join(stop_riders_agg_noBRT %>% mutate(stop1 = 1)) %>% mutate(stop1 = replace_na(stop1, 0)) %>% group_by(uniqueID) %>% summarise(stops_in_hex = sum(stop1))
 
@@ -1769,12 +1696,23 @@ output_xgb <- output_xgb  %>%
 output_xgb_sf <- left_join(output_xgb, hex) %>% st_sf()
 
 p1<-ggplot(output_xgb_sf)+
-  geom_sf(aes(fill = error), color =NA)
+  geom_sf(aes(fill = error), color =NA)+
+  
+   scale_fill_gradientn(
+    colours = colorRampPalette(rev(RColorBrewer::brewer.pal(11, "RdBu")))(255),
+    values = c(1.0, (0 - min(output_xgb_sf$error)) / (max(output_xgb_sf$error) - min(output_xgb_sf$error)), 0)
+  )+
+# paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
+  labs(fill = "XG Boost Model Error")+
+  theme(legend.position = 'bottom')+
+  mapTheme
+
+  
 
 
 p2<-full_fit_xgb %>% 
   extract_fit_parsnip() %>% 
-  vip(num_features = 30)
+  vip(num_features = 15)
 
 grid.arrange(ncol = 2, p1,p2)
 
@@ -1794,10 +1732,20 @@ models_mae <- data.frame(model = c("Random Forest", "XG Boost"),
 
 models_mae %>% gt()
 ```
+```{r}
+#predicted ridership
+
+ggplot(output_xgb_sf)+
+  geom_sf(aes(fill = prediction), color =NA)+
+  paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
+  labs(title = "XG Boost Ridership Prediction", fill = '')+
+  theme(legend.position = 'right')+
+  mapTheme
+```
 
 ```{r export hex with prediction}
 output_xgb_sf <- output_xgb_sf 
-st_write(output_xgb_sf, 'final_hex2.geojson', overwrite = T, append = F)
+#st_write(output_xgb_sf, 'final_hex2.geojson', overwrite = T, append = F)
 ```
 
 ## validating models
