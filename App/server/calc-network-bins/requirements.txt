@@ -1,0 +1,2 @@
+functions_framework==3.3.*
+geopandas==0.12.*
