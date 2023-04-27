@@ -1,0 +1,100 @@
+---
+title: "graphs outlines for web app"
+author: "Charlie Huemmler"
+date: "2023-04-21"
+output: 
+  rmdformats::material:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(sf)
+library(tidyverse)
+library(scales)
+library(cowplot)
+library(here)
+```
+
+## Ridership graphs 
+
+```{r}
+
+
+data_folder <- file.path(
+  here() %>% 
+    dirname(), 'data')
+
+final_hex <- read_sf(paste(data_folder, "/final_hex1.geojson", sep = ''))
+
+
+data_all <- final_hex %>% 
+  mutate(pred = ridership + rnorm(n = 1)*100,
+         highlight = ifelse(uniqueID == sample(1:615,1), "y","n"))
+
+
+
+```
+
+```{r }
+
+
+p1 <- ggplot()+
+  geom_jitter(data = data_all %>% filter(highlight == 'n'), 
+              aes(y = ridership, x = ""),
+              color = 'grey',
+              alpha = .5)+
+    geom_jitter(data = data_all %>% filter(highlight == 'y'), 
+              aes(y = ridership, x = ""),
+              color = 'orange',
+              width = .05)+
+  scale_y_continuous(label = comma)+
+  theme_minimal()+
+  theme(aspect.ratio =5)+
+  labs(y='',x='', title = "Actual Ridership")
+
+p2 <- ggplot()+
+  geom_jitter(data = data_all %>% filter(highlight == 'n'), 
+              aes(y = pred, x = ""),
+              color = 'grey',
+              alpha = .5)+
+    geom_jitter(data = data_all %>% filter(highlight == 'y'), 
+              aes(y = pred, x = ""),
+              color = 'blue',
+              width = .05)+
+  theme_minimal()+
+  theme(aspect.ratio =5, axis.text.y=element_blank())+
+  labs(y='',x='', title = "Predicted Ridership")
+  
+plot_grid(p1,p2)
+
+```
+
+## cars per HH
+
+```{r}
+#"pct0Car","pct1Car","pct2Car"
+
+
+car_df <- data_all %>% dplyr::select(c(uniqueID, pct0Car,pct1Car,pct2Car, highlight)) %>% st_drop_geometry()
+
+
+car_df <- car_df %>%  gather(-uniqueID,- highlight, key = numcars, value = percent)
+
+ggplot()+
+  geom_jitter(data = car_df %>% filter(highlight == 'n'), 
+              aes(y = percent, x = ""),
+              color = 'grey',
+              alpha = .5)+
+    geom_jitter(data = car_df %>% filter(highlight == 'y'), 
+              aes(y = percent, x = ""),
+              color = 'blue',
+              width = .05)+
+  theme_minimal()+
+  theme(aspect.ratio =5, axis.text.y=element_blank())+
+  labs(y='',x='', title = "Percent of households with amount of cars")+
+  facet_grid(~numcars)
+
+```
+

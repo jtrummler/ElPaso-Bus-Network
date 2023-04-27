@@ -1,0 +1,823 @@
+---
+title: "Latent Bus Ridership Demand Modelling of El Paso, Texas"
+author: "Charlie Huemmler, Yingxue Ou, Jack Rummler"
+date: "2023-03-26"
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+    code_folding: hide
+    pdf_document: default
+    theme: journal
+---
+
+
+```{r setup, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+  warning=FALSE,
+  message=FALSE,
+  results='hide')
+
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(lehdr)
+library(here)
+library(cowplot)
+library(paletteer)
+library(scales)
+library(ggpubr)
+library(rgdal)
+library(spdep)
+library(rsample)
+library(caret)
+library(ckanr)
+library(FNN)
+install.packages("set_engine")
+library(gt)
+library(recipes)
+library(set_engine)
+
+devtools::install_github("jamgreen/lehdr")
+
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+
+census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
+data_folder <- file.path(
+  here() %>% 
+    dirname(), 'data')
+
+mapTheme <- theme(
+    text = element_text( color = "black"),
+    plot.title = element_text(size = 14,colour = "black"),
+    plot.subtitle=element_text(face="italic"),
+    plot.caption=element_text(hjust=0),
+    axis.ticks = element_blank(),
+    panel.background = element_blank(),axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=2)
+  ) 
+
+plotTheme <- theme(
+    text = element_text( color = "black"),
+    plot.title = element_text(size = 14,colour = "black"),
+    plot.subtitle=element_text(face="italic"),
+    plot.caption=element_text(hjust=0),
+    #axis.ticks = element_blank(),
+    panel.background = element_blank(),
+    #axis.title = element_blank(),
+    #axis.text = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=2)
+  ) 
+
+sf::sf_use_s2(FALSE)
+options(scipen=999)
+
+#Package installs -------------------------------------------------------------
+load.fun <- function(x) { 
+  x <- as.character(x) 
+  if(isTRUE(x %in% .packages(all.available=TRUE))) { 
+    eval(parse(text=paste("require(", x, ")", sep=""))) 
+    print(paste(c(x, " : already installed; requiring"), collapse=''))
+  } else { 
+    #update.packages()
+    print(paste(c(x, " : not installed; installing"), collapse=''))
+    eval(parse(text=paste("install.packages('", x, "')", sep=""))) 
+    print(paste(c(x, " : installed and requiring"), collapse=''))
+    eval(parse(text=paste("require(", x, ")", sep=""))) 
+  } 
+} 
+
+########### Required Packages ###########
+packages = c("bayesplot", "lme4","RcppEigen",
+             "tidyverse", "tidyr", "AmesHousing", "broom", "caret", "dials", "doParallel", "e1071", "earth",
+             "ggrepel", "glmnet", "ipred", "klaR", "kknn", "pROC", "rpart", "randomForest",
+             "sessioninfo", "tidymodels","ranger", "recipes", "workflows", "themis","xgboost",
+             "sf", "nngeo", "mapview")
+
+for(i in seq_along(packages)){
+  packge <- as.character(packages[i])
+  load.fun(packge)
+}
+
+session_info()
+
+#########################################
+
+```
+
+
+
+```{r get el paso census data}
+censusvarsEP <- c(
+  "B01001_001E", # ACS total Pop estimate
+  "B01001I_001E", # Population - Hispanic or Latino 
+  "B02001_002E", # Population - White alone
+  "B02001_003E", # Population - Black or African American alone
+  "B02001_004E", # Population - American Indian and Alaska Native alone
+  "B02001_005E", # Population - Asian alone
+  "B02001_006E", # Population - Native Hawaiian and Other Pacific Islander alone
+  "B02001_007E", # Population - Some other race alone
+  "B02001_008E", # Population - Two or more races
+  "B19013_001E", # Median household income in the past 12 months (in 2019 inflation-adjusted dollars)
+  "B25001_001E", # Total housing units
+  "B25002_002E", # Occupancy status - Occupied housing units
+  "B25024_001E", # Gross rent as a percentage of household income in the past 12 months
+  "B25044_001E", # Vehicles available
+  "B28005_001E", # Means of transportation to work by age
+  "B28010_001E", # Commuting time to work (in minutes)
+  "B10052_002E", # Disability
+  "B06009_002E", # Less than high school
+  "B06009_003E", # High School
+  "B06009_004E", # Associates or equivalent
+  "B06009_005E", # Bachelors
+  "B06009_006E" # Graduate or prof. degree
+)
+
+elpaso <- get_acs(geography = "tract",
+                             year = 2020, 
+                             variables = censusvarsEP, 
+                             geometry = T,
+                             state = "TX", 
+                             county = "El Paso", 
+                             output = "wide") 
+
+#vec to not divide by sqkm
+dontdiv<- c("GEOID","NAME","medHHInc","grossRentPerInc","commuteToWork","geometry","area_sqmile")
+
+elpaso <- elpaso %>%
+rename(
+  totalPop = B01001_001E, 
+  hlPop = B01001I_001E, 
+  whitePop = B02001_002E, 
+  blackPop = B02001_003E,
+  aiPop = B02001_004E,
+  asianPop = B02001_005E,
+  nhPop = B02001_006E,
+  otherRacePop = B02001_007E,
+  twoPlusRacePop = B02001_008E,
+  medHHInc = B19013_001E,
+  totalHU = B25001_001E, 
+  occupiedHU = B25002_002E, 
+  grossRentPerInc = B25024_001E, 
+  transByAge = B28005_001E,
+  commuteToWork = B28010_001E,
+  lessThanHS = B06009_002E,
+  highSchool = B06009_003E,
+  associatesDeg = B06009_004E,
+  bachelorDeg = B06009_005E,
+  professionalDeg = B06009_006E,
+  disability = B10052_002E) %>%
+    mutate(area_sqmile = st_area(geometry)/2590000
+         ) %>%  st_as_sf(crs = 4269) %>%
+  mutate_at(vars(-dontdiv), funs(as.numeric(./area_sqmile)))
+
+
+```
+
+```{r make_hex_net}
+busroutes <-  read_sf(paste(data_folder, "/transit_lines.geojson", sep = '')) %>% st_transform(crs = 4269)
+
+roads <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = '')) %>% st_transform(crs = 4269)
+
+#ask alex about this map
+
+
+futureLU <- read_sf(paste(data_folder, "/FutureLandUse.shp", sep = '')) %>% st_transform(crs = 4269)  
+
+futureLU_crop <- futureLU %>% st_crop(y = st_bbox(busroutes))
+
+ ggplot()+
+    geom_sf(data = futureLU, aes(fill = COMMENTS), color = NA)+
+    geom_sf(data = roads)+
+    geom_sf(data = busroutes, color = 'red')+
+   mapTheme+
+   labs(fill = 'Future Land Use', title = 'Deciding which areas to include in our model')
+ 
+
+
+excludeLU <- c("Fort Bliss Military","Fort Bliss Mixed Use (Airport)","Preserve","Industrial and/or Railyards","Remote","Military Reserve")
+
+
+exclude_area <-  futureLU_crop %>% filter(COMMENTS %in% excludeLU) %>% st_union()
+
+
+
+elpaso_outline <- elpaso %>% st_union() %>% st_sf() %>% st_crop(y = st_bbox(busroutes)) %>% st_difference(exclude_area)
+
+
+hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F) %>% st_sf() 
+
+hex <- hex[elpaso_outline,] %>%
+  mutate(uniqueID = rownames(.))
+
+ggplot(hex)+
+  geom_sf()
+
+```
+
+
+
+```{r target variable into net}
+data_folder <- file.path(here() %>% dirname(), 'data')
+
+riderstops_sf <- read_csv(paste(data_folder, "/riderstops1.csv", sep = '')) %>%
+  filter(!is.na(stop_lat)) %>%
+  st_as_sf(coords = c('stop_lon', 'stop_lat'), crs = 4269) 
+
+
+
+stop_riders_agg <- riderstops_sf %>% group_by(TP, RT) %>% summarise(ridership = sum(Ons) + sum(Offs))
+
+
+stop_riders_agg_noBRT <- stop_riders_agg %>% filter(! RT %in% c(205,206,207,208))
+stop_riders_agg_BRT <- stop_riders_agg %>% filter(RT %in% c(205,206,207,208))
+
+ridership_net_local <- stop_riders_agg_noBRT %>% 
+  dplyr::select(ridership) %>% 
+  aggregate(., hex, sum) %>%
+  mutate(ridership = replace_na(ridership, 0),
+         uniqueID = rownames(.))
+
+ridership_net_all <- stop_riders_agg %>% 
+  dplyr::select(ridership) %>% 
+  aggregate(., hex, sum) %>%
+  mutate(ridership = replace_na(ridership, 0),
+         uniqueID = rownames(.))
+
+
+ridership_net_BRT <- stop_riders_agg_BRT %>% 
+  dplyr::select(ridership) %>% 
+  aggregate(., hex, sum) %>%
+  mutate(ridership = replace_na(ridership, 0),
+         uniqueID = rownames(.))
+
+
+
+p1a <- ridership_net_local %>%
+  ggplot()+
+  geom_sf(aes(fill = ridership), color =NA)+
+  paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
+  labs(fill = "Local Ridership")+
+  theme(legend.position = 'right')+
+  mapTheme
+
+
+p1b <- ridership_net_all %>%
+  ggplot()+
+  geom_sf(aes(fill = ridership), color =NA)+
+  paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
+  labs(fill = "All Ridership")+
+  theme(legend.position = 'right')+
+  mapTheme
+
+
+p1c <- ridership_net_BRT %>%
+  ggplot()+
+  geom_sf(aes(fill = ridership), color =NA)+
+  paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
+  labs(fill = "BRT Ridership")+
+  theme(legend.position = 'right')+
+  mapTheme
+
+plot_grid(p1a,p1b, p1c)
+
+```
+
+
+
+```{r create census hex}
+
+#https://lehd.ces.census.gov/data/lodes/LODES7/LODESTechDoc7.5.pdf
+
+#get lhodes work place data
+tx_work <- grab_lodes(state = "tx", year = 2019, lodes_type = "wac", job_type = "JT01", 
+                    segment = "S000", state_part = "main", agg_geo = "tract") %>% 
+  rename(total_jobs = C000,
+         age_29_or_younger = CA01,
+         age_30_to_54 = CA02,
+         age_55_or_older = CA03,
+         monthly_income_1250_or_less = CE01,
+         monthly_income_1251_to_3333 = CE02,
+         monthly_income_3334_or_more = CE03,
+         NAICS11 = CNS01,
+         NAICS21 = CNS02,
+         NAICS22 = CNS03,
+         NAICS23 = CNS04,
+         NAICS31_33 = CNS05,
+         NAICS42 = CNS06,
+         NAICS44_46 = CNS07,
+         NAICS48_49 = CNS08,
+         NAICS51 = CNS09,
+         NAICS52 = CNS10,
+         NAICS53 = CNS11,
+         NAICS54 = CNS12,
+         NAICS55 = CNS13,
+         NAICS56 = CNS14,
+         NAICS61 = CNS15,
+         NAICS62 = CNS16,
+         NAICS71 = CNS17,
+         NAICS72 = CNS18,
+         NAICS81 = CNS19,
+         NAICS92 = CNS20,
+         white_work = CR01,
+         black_work = CR02,
+         native_american_work = CR03,
+         asian_work = CR04,
+         pacific_work = CR05,
+         mixed_race_work = CR07,
+         not_hispanic_work = CT01,
+         hispanic_work = CT02,
+         male_work = CS01,
+         female_work = CS02) %>% select(-starts_with("C"))
+#merge to census tracts data
+elpaso_work <- left_join(elpaso, tx_work, by = c('GEOID' = 'w_tract')) %>% st_sf() %>%
+  mutate_at(colnames(tx_work)[4:length(colnames(tx_work))], funs(as.numeric(./area_sqmile)))
+
+#add to hex
+census_hex <- hex %>% st_centroid() %>% st_join(elpaso_work, join=st_within) %>% 
+  st_drop_geometry() %>% 
+  full_join(., hex) %>% st_sf()
+
+
+```
+
+```{r}
+#tring another way
+
+#hex_join <- st_intersection(hex, elpaso_work) %>% group_by(uniqueID) %>% 
+ # summarize()
+
+#ggplot(hex_join)+
+ # geom_sf()
+```
+
+
+```{r walkabiity features}
+walkscore <- read_sf(paste(data_folder, "/nwi_bg.geojson", sep = '')) %>% rename(
+  totalPop_walk = totalPop
+)
+
+walk_hex <- hex %>% st_centroid() %>% st_join(walkscore, join=st_within)
+
+```
+
+```{r make final hex}
+final_hex <- left_join(ridership_net_local, st_drop_geometry(census_hex), by = "uniqueID") %>% 
+  left_join(st_drop_geometry(walk_hex), by = "uniqueID") %>% replace(is.na(.), 0)
+
+```
+
+```{r feature mapping and scatterplot}
+
+
+
+inde_var <- "asianPop"
+
+
+
+scat <- final_hex %>% st_drop_geometry() %>% 
+  ggplot(aes(y = ridership, x = get(inde_var)))+
+  geom_point(alpha = .5)+
+  scale_x_continuous(labels = comma)+
+  scale_y_continuous(labels = comma)+
+  theme_bw()+
+  labs(title = paste("Hex Ridership vs",inde_var), y = 'Ridership', x = inde_var)+
+  stat_cor(method = "pearson")+
+  geom_smooth(method = 'lm', se = F, color = 'red', linetype= 'dashed')
+
+map <- final_hex %>%
+  ggplot()+
+  geom_sf(aes(fill = get(inde_var)), color =NA)+
+  paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
+  labs(fill = inde_var)+
+  theme(legend.position = 'right')+
+  mapTheme
+  
+plot_grid(scat, map, rel_widths = c(1,1.3))
+```
+
+```{r aggregating vars}
+
+lhodes_vars <-c(colnames(tx_work)[5:length(colnames(tx_work))])
+
+
+census_vars <- elpaso %>% select(!starts_with('B') & ! c("GEOID","NAME","area_sqmile")) %>% st_drop_geometry() %>% colnames()
+walkscore_vars <- c()
+
+final_hex <- final_hex %>% select(ridership, lhodes_vars, census_vars, walkscore_vars, geometry) %>% st_sf()
+
+
+```
+
+```{r data partition}
+# inTrain <- createDataPartition(
+#               y = final_hex$ridership, 
+#               p = .80, list = FALSE)
+# 
+# fh_train <- final_hex[-inTrain,]
+# fh_test <- final_hex[inTrain,]
+
+```
+
+
+
+
+
+
+```{r modeling}
+
+#add indevar for number of stops in hexbin
+
+
+
+# m1.train <- lm(formula = ridership ~ .,
+#          data = final_hex %>% st_drop_geometry())
+# 
+# # ... nodels for xgboost, rf, etc
+# 
+# 
+# m1.test <-
+#   fh_test %>%
+#   mutate(ridership.pred = predict(m1.train, fh_test),
+#          ridership.Error = ridership.pred - ridership,
+#          ridership.AbsError = abs(ridership.pred - ridership),
+#          ridership.APE = (abs(ridership.pred - ridership)) / ridership.pred)
+# 
+# 
+# 
+# m1.mean <- m1.test %>% summarize(model = "OLS", mae = mean(ridership.AbsError),mape =mean(ridership.APE)) 
+# 
+# m1.mean %>% st_drop_geometry() %>%  gt()
+
+
+```
+
+
+
+
+
+```{r}
+# fitControl <- trainControl(method = "cv", number = 100)
+# set.seed(825)
+# 
+# reg.cv <- 
+#   train(ridership ~ ., data = st_drop_geometry(final_hex),  
+#      method = "lm", trControl = fitControl, na.action = na.pass)
+# 
+# 
+# reg.cv$resample[1:5,]
+
+## ways to see if each cv group has downtown hex in test or training
+ 
+```
+
+
+
+
+
+
+```{r predict ridership to hex}
+# final_hex$predicted_ridership <- predict(m1.test)
+# 
+# 
+# final_hex %>%
+#   ggplot()+
+#   geom_sf(aes(fill = predicted_ridership), color =NA)+
+#   paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
+#   labs(fill = 'Predicted Ridership')+
+#   theme(legend.position = 'right')+
+#   mapTheme
+# 
+# 
+# m1.test %>%
+#   ggplot()+
+#   geom_sf(aes(fill = ridership.AbsError), color =NA)+
+#   paletteer::scale_fill_paletteer_c("grDevices::Red-Blue", -1, labels= comma)+
+#   labs(fill = 'Test set abs error')+
+#   theme(legend.position = 'right')+
+#   mapTheme
+#st_write(final_hex, "final_hex.geojson")
+  
+```
+
+```{r}
+set.seed(13)
+
+
+input <- final_hex %>% st_drop_geometry() %>% mutate(cvID = sample(round(nrow(final_hex) / 24), size=nrow(final_hex), replace = TRUE) )
+
+### Initial Split for Training and Test
+data_split <- initial_split(input, strata = "ridership", prop = 0.75)
+ep_train <- training(data_split)
+ep_test  <- testing(data_split)
+
+
+### Cross Validation
+## LOGOCV on Neighborhood with group_vfold_cv()
+cv_splits_geo <- group_vfold_cv(ep_train,  
+                                group = "cvID")
+print(cv_splits_geo)
+
+### Create Recipes
+
+# Feature Creation
+model_rec <- recipe(ridership ~ ., data = input) %>%
+  #update_role(Neighborhood, new_role = "Neighborhood") %>%
+  #step_other(Neighborhood, threshold = 0.005) %>%
+  #step_dummy(all_nominal(), -Neighborhood) %>%
+  #step_log(Sale_Price, skip = TRUE) %>%
+  #step_zv(all_predictors()) %>%
+  step_center(all_predictors(), -ridership) %>%
+  step_scale(all_predictors(), -ridership)
+
+  #step_ns(Latitude, Longitude, options = list(df = 4))
+
+# See the data after all transformations
+glimpse(model_rec %>% prep() %>% juice())
+
+
+## Model specifications
+lm_plan <- 
+  linear_reg() 
+#%>% 
+ # set_engine("lm")
+
+glmnet_plan <- 
+  linear_reg() %>% 
+  set_args(penalty  = tune()) %>%
+  set_args(mixture  = tune()) %>%
+  set_engine("glmnet")
+
+rf_plan <- rand_forest() %>%
+  set_args(mtry  = tune()) %>%
+  set_args(min_n = tune()) %>%
+  set_args(trees = 1000) %>% 
+  set_engine("ranger", importance = "impurity") %>% 
+  set_mode("regression")
+
+XGB_plan <- boost_tree() %>%
+  set_args(mtry  = tune()) %>%
+  set_args(min_n = tune()) %>%
+  set_args(trees = 100) %>% 
+  set_engine("xgboost") %>% 
+  set_mode("regression")
+
+
+# Hyperparameter grid for glmnet (penalization)
+glmnet_grid <- expand.grid(penalty = seq(0, 1, by = .25), 
+                           mixture = seq(0,1,0.25))
+rf_grid <- expand.grid(mtry = c(2,5), 
+                       min_n = c(1,5))
+xgb_grid <- expand.grid(mtry = c(3,5), 
+                        min_n = c(1,5))
+
+
+# create workflow
+lm_wf <-
+  workflow() %>% 
+  add_recipe(model_rec) %>% 
+  add_model(lm_plan)
+glmnet_wf <-
+  workflow() %>% 
+  add_recipe(model_rec) %>% 
+  add_model(glmnet_plan)
+rf_wf <-
+  workflow() %>% 
+  add_recipe(model_rec) %>% 
+  add_model(rf_plan)
+xgb_wf <-
+  workflow() %>% 
+  add_recipe(model_rec) %>% 
+  add_model(XGB_plan)
+
+
+# fit model to workflow and calculate metrics
+control <- control_resamples(save_pred = TRUE, verbose = TRUE)
+metrics <- metric_set(rmse, rsq, mape, smape)
+lm_tuned <- lm_wf %>%
+  tune::fit_resamples(.,
+                      resamples = cv_splits_geo,
+                      control   = control,
+                      metrics   = metrics)
+
+glmnet_tuned <- glmnet_wf %>%
+  tune::tune_grid(.,
+                  resamples = cv_splits_geo,
+                  grid      = glmnet_grid,
+                  control   = control,
+                  metrics   = metrics)
+
+rf_tuned <- rf_wf %>%
+  tune::tune_grid(.,
+                  resamples = cv_splits_geo,
+                  grid      = rf_grid,
+                  control   = control,
+                  metrics   = metrics)
+
+xgb_tuned <- xgb_wf %>%
+  tune::tune_grid(.,
+                  resamples = cv_splits_geo,
+                  grid      = xgb_grid,
+                  control   = control,
+                  metrics   = metrics)
+
+## metrics across grid
+autoplot(xgb_tuned)
+collect_metrics(xgb_tuned)
+
+## 'Best' by some metric and margin
+show_best(lm_tuned, metric = "rsq", n = 15)
+show_best(glmnet_tuned, metric = "rsq", n = 15)
+show_best(rf_tuned, metric = "rsq", n = 15)
+show_best(xgb_tuned, metric = "rsq", n = 15)
+
+lm_best_params     <- select_best(lm_tuned, metric = "rmse"    )
+glmnet_best_params <- select_best(glmnet_tuned, metric = "rmse")
+rf_best_params     <- select_best(rf_tuned, metric = "rmse"    )
+xgb_best_params    <- select_best(xgb_tuned, metric = "rmse"   )
+
+## Final workflow
+lm_best_wf     <- finalize_workflow(lm_wf, lm_best_params)
+glmnet_best_wf <- finalize_workflow(glmnet_wf, glmnet_best_params)
+rf_best_wf     <- finalize_workflow(rf_wf, rf_best_params)
+xgb_best_wf    <- finalize_workflow(xgb_wf, xgb_best_params)
+
+
+# last_fit() emulates the process where, after determining the best model, the final fit on the entire training set is needed and is then evaluated on the test set.
+lm_val_fit_geo <- lm_best_wf %>% 
+  last_fit(split     = data_split,
+           control   = control,
+           metrics   = metrics)
+
+glmnet_val_fit_geo <- glmnet_best_wf %>% 
+  last_fit(split     = data_split,
+           control   = control,
+           metrics   = metrics)
+
+rf_val_fit_geo <- rf_best_wf %>% 
+  last_fit(split     = data_split,
+           control   = control,
+           metrics   = metrics)
+
+xgb_val_fit_geo <- xgb_best_wf %>% 
+  last_fit(split     = data_split,
+           control   = control,
+           metrics   = metrics)
+
+
+
+
+```
+
+
+```{r}
+
+# Pull best hyperparam preds from out-of-fold predictions
+lm_best_OOF_preds <- collect_predictions(lm_tuned) 
+
+glmnet_best_OOF_preds <- collect_predictions(glmnet_tuned) %>% 
+  filter(penalty  == glmnet_best_params$penalty[1] & mixture == glmnet_best_params$mixture[1])
+
+rf_best_OOF_preds <- collect_predictions(rf_tuned) %>% 
+  filter(mtry  == rf_best_params$mtry[1] & min_n == rf_best_params$min_n[1])
+
+xgb_best_OOF_preds <- collect_predictions(xgb_tuned) %>% 
+  filter(mtry  == xgb_best_params$mtry[1] & min_n == xgb_best_params$min_n[1])
+
+# collect validation set predictions from last_fit model
+lm_val_pred_geo     <- collect_predictions(lm_val_fit_geo)
+glmnet_val_pred_geo <- collect_predictions(glmnet_val_fit_geo)
+rf_val_pred_geo     <- collect_predictions(rf_val_fit_geo)
+xgb_val_pred_geo    <- collect_predictions(xgb_val_fit_geo)
+
+
+# Aggregate OOF predictions (they do not overlap with Validation prediction set)
+OOF_preds <- rbind(data.frame(dplyr::select(lm_best_OOF_preds, .pred, ridership), model = "lm"),
+                   data.frame(dplyr::select(glmnet_best_OOF_preds, .pred, ridership), model = "glmnet"),
+                   data.frame(dplyr::select(rf_best_OOF_preds, .pred, ridership), model = "rf"),
+                   data.frame(dplyr::select(xgb_best_OOF_preds, .pred, ridership), model = "xgb")) %>% 
+  group_by(model) %>% 
+  mutate(ridership = log(ridership),
+         RMSE = yardstick::rmse_vec(ridership, .pred),
+         MAE  = yardstick::mae_vec(ridership, .pred),
+         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
+  ungroup() %>% 
+  mutate(model = factor(model, levels=c("lm","glmnet","rf","xgb")))
+
+# average error for each model
+ggplot(data = OOF_preds %>% 
+         dplyr::select(model, MAPE) %>% 
+         distinct() , 
+       aes(x = model, y = MAPE, group = 1)) +
+  geom_path(color = "red") +
+  geom_label(aes(label = paste0(round(MAPE,1),"%"))) +
+  theme_bw()
+
+# OOF predicted versus actual
+ggplot(OOF_preds, aes(x = ridership, y = .pred, group = model)) +
+  geom_point(alpha = 0.3) +
+  geom_abline(linetype = "dashed", color = "red") +
+  geom_smooth(method = "lm", color = "blue") +
+  coord_equal() +
+  facet_wrap(~model, nrow = 2) +
+  theme_bw()
+
+
+# Aggregate predictions from Validation set
+val_preds <- rbind(data.frame(lm_val_pred_geo, model = "lm"),
+                   data.frame(glmnet_val_pred_geo, model = "glmnet"),
+                   data.frame(rf_val_pred_geo, model = "rf"),
+                   data.frame(xgb_val_pred_geo, model = "xgb")) %>% 
+  left_join(., input %>% 
+              rowid_to_column(var = ".row") %>% 
+              dplyr::select(cvID, .row), 
+            by = ".row") %>% 
+  group_by(model) %>%
+  mutate(ridership = log(ridership),
+         RMSE = yardstick::rmse_vec(ridership, .pred),
+         MAE  = yardstick::mae_vec(ridership, .pred),
+         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
+  ungroup() %>% 
+  mutate(model = factor(model, levels=c("lm","glmnet","rf","xgb")))
+
+# plot MAPE by model type
+ggplot(data = val_preds %>% 
+         dplyr::select(model, MAPE) %>% 
+         distinct() , 
+       aes(x = model, y = MAPE, group = 1)) +
+  geom_path(color = "red") +
+  geom_label(aes(label = paste0(round(MAPE,1),"%"))) +
+  theme_bw()
+
+# Validation Predicted vs. actual
+ggplot(val_preds, aes(x = ridership, y = .pred, group = model)) +
+  geom_point(alpha = 0.3) +
+  geom_abline(linetype = "dashed", color = "red") +
+  geom_smooth(method = "lm", color = "blue") +
+  coord_equal() +
+  facet_wrap(~model, nrow = 2) +
+  theme_bw()
+
+# join test data back to make spatial
+val_pred_sf <- val_preds %>% 
+  group_by(model) %>% 
+  rowwise() %>% 
+  mutate(RMSE = yardstick::rmse_vec(ridership, .pred),
+         MAE  = yardstick::mae_vec(ridership, .pred),
+         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
+  st_as_sf(., coords = c("Longitude", "Latitude"),
+           remove = FALSE,
+           crs = 4326)
+
+# map errors by point
+mapview(filter(val_pred_sf, model == "rf"), zcol = "MAPE")
+
+# aggregate val error to Neighborhood 
+val_MAPE_by_hood <- val_preds %>% 
+  group_by(Neighborhood, model) %>% 
+  summarise(RMSE = yardstick::rmse_vec(ridership, .pred),
+         MAE  = yardstick::mae_vec(ridership, .pred),
+         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
+  ungroup() 
+
+# plot MAPE by Hood
+ggplot(val_MAPE_by_hood, aes(x = reorder(Neighborhood, MAPE), y = MAPE)) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(breaks = seq(0,10,1)) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = -45, hjust = 0)
+  )
+
+## Fit and Extract final model
+## Final fit on all data, then extract model
+full_fit_lm     <- lm_best_wf %>% fit(input)
+full_fit_glmnet <- glmnet_best_wf %>% fit(input)
+full_fit_rf     <- rf_best_wf %>% fit(input)
+full_fit_xgb    <- xgb_best_wf %>% fit(input)
+
+predict(full_fit_rf, new_data = input[3,]) %>% 
+  mutate(.pred_original = exp(.pred))
+
+
+# extract final model object
+lm_full_mod     <- full_fit_lm  $fit$fit$fit
+glmnet_full_mod <- full_fit_glmnet$fit$fit$fit
+rf_full_mod     <- full_fit_rf  $fit$fit$fit
+xgb_full_mod    <- full_fit_xgb $fit$fit$fit
+
+
+
+
+```
+
+
+
+
+
