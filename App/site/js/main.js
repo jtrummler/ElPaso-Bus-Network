@@ -60,35 +60,25 @@ const importButton = document.getElementById('import-button');
     fileInput.click();
   });
 
-  fileInput.addEventListener('change', () => {
-    const file = fileInput.files[0];
-    const accessToken = 'YOUR_DROPBOX_ACCESS_TOKEN';
-    const url = 'https://content.dropboxapi.com/2/files/upload';
+  fileInput.addEventListener('change', async () => {
+    // Get the form data from the import_routes_form
+    const form = document.getElementById('import_routes_form');
+    const formData = new FormData(form);
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', url, true);
-    xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
-    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-    xhr.setRequestHeader('Dropbox-API-Arg', JSON.stringify({
-      path: `/${file.name}`,
-      mode: 'add',
-      autorename: true,
-      mute: false
-    }));
+    // Send a POST request to the server with the form data
+    const resp = await fetch('http://localhost:8080' /* <-- The URL of your cloud function */, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await resp.json();
 
-    xhr.onload = () => {
-      if (xhr.status === 200) {
-        alert('File uploaded successfully!');
-      } else {
-        alert('An error occurred while uploading the file.');
-      }
-    };
-
-    xhr.send(file);
+    // Do whatever you want with the data, e.g., merge the new data into the
+    // existing map hex bin layer.
+    console.log(data);
   });
 
 
 
-  
+
 
 
