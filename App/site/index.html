@@ -5,13 +5,13 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
 
         <title>El Paso Bus System</title>
-    
+
           <script>
             function openPopup() {
               var popup = document.getElementById('popup');
               popup.style.display = 'block';
             }
-      
+
             function closePopup() {
               var popup = document.getElementById('popup');
               popup.style.display = 'none';
@@ -20,7 +20,7 @@
 
         <!-- My CSS files-->
         <link href="css/styles.css" rel="stylesheet" type="text/css"/>
-        
+
         <!-- Using hosted version of Leaflet-->
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
         integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI="
@@ -30,7 +30,7 @@
         <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
         integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM="
         crossorigin=""></script>
-        
+
         <!-- My project JS modules-->
         <script type="module" src="js/main.js"></script>
 
@@ -62,21 +62,21 @@
     <div id="map" >
         <div id="label">
             <img src="./image/logo.png" alt="Logo" class="logo"/>
-            <form class="button_list"></form>
+            <form id="import_routes_form" enctype="multipart/form-data" class="button_list">
                 <div>
-                    <button id="ridership-button" class="button-89" role="button">Current Routes</button>
+                    <button id="ridership-button" class="button-89" role="button" type="button">Current Routes</button>
                     <select id="routes-select"></select>
                 </div>
-    
-                <button id="hex-button" class="button-89" role="button">Predict Model</button>
-    
-                <button class="button-89" id="import-button">Import routes</button>
-                <input type="file" id="file-input" accept=".geojson" style="display:none">
-    
-                <button class="button-89" id="github-button">GitHub pages</button>
+
+                <button id="hex-button" class="button-89" role="button" type="button">Predict Model</button>
+
+                <button class="button-89" id="import-button" type="button">Import routes</button>
+                <input type="file" name="network_kml" id="file-input" accept=".geojson" style="display:none">
+
+                <button class="button-89" id="github-button" type="button">GitHub pages</button>
             </form>
         </div>
-    
+
         <div id="content">
             <div class="inner-content">
                 <!-- Create function when click on tab, show content -->
@@ -112,7 +112,7 @@
                       </div>
                   </div>
 
-                
+
                 <div class="tabcontent" id="model-tab">
                     <div id="BI"></div>
                     <div class="vertical-line"></div>
@@ -141,9 +141,9 @@
 
     </div>
 
-    
-        
-    
+
+
+
 
     </div>
 
@@ -154,4 +154,4 @@
 
 
 
-  
+
