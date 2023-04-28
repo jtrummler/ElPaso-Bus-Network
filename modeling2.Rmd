@@ -1,0 +1,345 @@
+---
+title: "modeling2"
+author: "Charlie Huemmler"
+date: "2023-04-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r modeling workflow, warning=FALSE, message=FALSE, results=FALSE}
+set.seed(13)
+
+input <- final_hex %>% 
+  st_drop_geometry() %>% 
+  mutate(cvID = sample(round(nrow(final_hex) / 24), 
+                       size=nrow(final_hex), 
+                       replace = TRUE) )
+
+### Initial Split for Training and Test
+data_split <- initial_split(input, strata = "ridership", prop = 0.75)
+ep_train <- training(data_split)
+ep_test  <- testing(data_split)
+
+
+### Cross Validation
+## LOGOCV on Neighborhood with group_vfold_cv()
+cv_splits_geo <- group_vfold_cv(ep_train,  
+                                group = "cvID")
+print(cv_splits_geo)
+```
+
+```{r }
+### Create Recipes
+
+# Feature Creation
+model_rec <- recipe(ridership ~ ., data = input) %>%
+  #update_role(Neighborhood, new_role = "Neighborhood") %>%
+  #step_other(Neighborhood, threshold = 0.005) %>%
+  #step_dummy(all_nominal(), -Neighborhood) %>%
+  #step_log(Sale_Price, skip = TRUE) %>%
+  #step_zv(all_predictors()) %>%
+  step_center(all_predictors(), -ridership) %>%
+  step_scale(all_predictors(), -ridership)
+
+  #step_ns(Latitude, Longitude, options = list(df = 4))
+
+# See the data after all transformations
+glimpse(model_rec %>% prep() %>% juice())
+
+
+## Model specifications
+lm_plan <- 
+  linear_reg() %>% 
+  set_engine("lm")
+
+glmnet_plan <- 
+  linear_reg() %>% 
+  set_args(penalty  = tune()) %>%
+  set_args(mixture  = tune()) %>%
+  set_engine("glmnet")
+
+rf_plan <- rand_forest() %>%
+  set_args(mtry  = tune()) %>%
+  set_args(min_n = tune()) %>%
+  set_args(trees = 1000) %>% 
+  set_engine("ranger", importance = "impurity") %>% 
+  set_mode("regression")
+
+XGB_plan <- boost_tree() %>%
+  set_args(mtry  = tune()) %>%
+  set_args(min_n = tune()) %>%
+  set_args(trees = 100) %>% 
+  set_engine("xgboost") %>% 
+  set_mode("regression")
+
+
+# Hyperparameter grid for glmnet (penalization)
+glmnet_grid <- expand.grid(penalty = seq(0, 1, by = .25), 
+                           mixture = seq(0,1,0.25))
+rf_grid <- expand.grid(mtry = c(2,5), 
+                       min_n = c(1,5))
+xgb_grid <- expand.grid(mtry = c(3,5), 
+                        min_n = c(1,5))
+
+
+# create workflow
+lm_wf <-
+  workflow() %>% 
+  add_recipe(model_rec) %>% 
+  add_model(lm_plan)
+glmnet_wf <-
+  workflow() %>% 
+  add_recipe(model_rec) %>% 
+  add_model(glmnet_plan)
+rf_wf <-
+  workflow() %>% 
+  add_recipe(model_rec) %>% 
+  add_model(rf_plan)
+xgb_wf <-
+  workflow() %>% 
+  add_recipe(model_rec) %>% 
+  add_model(XGB_plan)
+```
+
+```{r }
+# fit model to workflow and calculate metrics
+control <- control_resamples(save_pred = TRUE, verbose = TRUE)
+metrics <- metric_set(rmse, rsq, mape, smape, mae)
+lm_tuned <- lm_wf %>%
+  tune::fit_resamples(.,
+                      resamples = cv_splits_geo,
+                      control   = control,
+                      metrics   = metrics)
+
+glmnet_tuned <- glmnet_wf %>%
+  tune::tune_grid(.,
+                  resamples = cv_splits_geo,
+                  grid      = glmnet_grid,
+                  control   = control,
+                  metrics   = metrics)
+
+rf_tuned <- rf_wf %>%
+  tune::tune_grid(.,
+                  resamples = cv_splits_geo,
+                  grid      = rf_grid,
+                  control   = control,
+                  metrics   = metrics)
+
+xgb_tuned <- xgb_wf %>%
+  tune::tune_grid(.,
+                  resamples = cv_splits_geo,
+                  grid      = xgb_grid,
+                  control   = control,
+                  metrics   = metrics)
+
+## metrics across grid
+autoplot(xgb_tuned)
+collect_metrics(xgb_tuned)
+```
+
+```{r }
+## 'Best' by some metric and margin
+show_best(lm_tuned, metric = "mae", n = 15)
+show_best(glmnet_tuned, metric = "mape", n = 15)
+show_best(rf_tuned, metric = "rsq", n = 15)
+show_best(xgb_tuned, metric = "rsq", n = 15)
+
+lm_best_params     <- select_best(lm_tuned, metric = "rmse"    )
+glmnet_best_params <- select_best(glmnet_tuned, metric = "rmse")
+rf_best_params     <- select_best(rf_tuned, metric = "rmse"    )
+xgb_best_params    <- select_best(xgb_tuned, metric = "rmse"   )
+
+## Final workflow
+lm_best_wf     <- finalize_workflow(lm_wf, lm_best_params)
+glmnet_best_wf <- finalize_workflow(glmnet_wf, glmnet_best_params)
+rf_best_wf     <- finalize_workflow(rf_wf, rf_best_params)
+xgb_best_wf    <- finalize_workflow(xgb_wf, xgb_best_params)
+
+```
+
+```{r }
+
+# last_fit() emulates the process where, after determining the best model, the final fit on the entire training set is needed and is then evaluated on the test set.
+lm_val_fit_geo <- lm_best_wf %>% 
+  last_fit(split     = data_split,
+           control   = control,
+           metrics   = metrics)
+
+glmnet_val_fit_geo <- glmnet_best_wf %>% 
+  last_fit(split     = data_split,
+           control   = control,
+           metrics   = metrics)
+
+rf_val_fit_geo <- rf_best_wf %>% 
+  last_fit(split     = data_split,
+           control   = control,
+           metrics   = metrics)
+
+xgb_val_fit_geo <- xgb_best_wf %>% 
+  last_fit(split     = data_split,
+           control   = control,
+           metrics   = metrics)
+
+```
+
+```{r modeling pt 3}
+##########################################################
+# This script follows after 2_Regression_models_Geo.R
+##########################################################
+
+# Pull best hyperparam preds from out-of-fold predictions
+lm_best_OOF_preds <- collect_predictions(lm_tuned) 
+
+glmnet_best_OOF_preds <- collect_predictions(glmnet_tuned) %>% 
+  filter(penalty  == glmnet_best_params$penalty[1] & mixture == glmnet_best_params$mixture[1])
+
+rf_best_OOF_preds <- collect_predictions(rf_tuned) %>% 
+  filter(mtry  == rf_best_params$mtry[1] & min_n == rf_best_params$min_n[1])
+
+xgb_best_OOF_preds <- collect_predictions(xgb_tuned) %>% 
+  filter(mtry  == xgb_best_params$mtry[1] & min_n == xgb_best_params$min_n[1])
+
+# collect validation set predictions from last_fit model
+lm_val_pred_geo     <- collect_predictions(lm_val_fit_geo)
+glmnet_val_pred_geo <- collect_predictions(glmnet_val_fit_geo)
+rf_val_pred_geo     <- collect_predictions(rf_val_fit_geo)
+xgb_val_pred_geo    <- collect_predictions(xgb_val_fit_geo)
+
+
+# Aggregate OOF predictions (they do not overlap with Validation prediction set)
+OOF_preds <- rbind(data.frame(dplyr::select(lm_best_OOF_preds, .pred, ridership), model = "lm"),
+                   data.frame(dplyr::select(glmnet_best_OOF_preds, .pred, ridership), model = "glmnet"),
+                   data.frame(dplyr::select(rf_best_OOF_preds, .pred, ridership), model = "rf"),
+                   data.frame(dplyr::select(xgb_best_OOF_preds, .pred, ridership), model = "xgb")) %>% 
+  group_by(model) %>% 
+  mutate(ridership = log(ridership),
+         RMSE = yardstick::rmse_vec(ridership, .pred),
+         MAE  = yardstick::mae_vec(ridership, .pred),
+         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
+  ungroup() %>% 
+  mutate(model = factor(model, levels=c("lm","glmnet","rf","xgb")))
+
+# average error for each model
+ggplot(data = OOF_preds %>% 
+         dplyr::select(model, MAPE) %>% 
+         distinct() , 
+       aes(x = model, y = MAPE, group = 1)) +
+  geom_path(color = "red") +
+  geom_label(aes(label = paste0(round(MAPE,1),"%"))) +
+  theme_bw()
+
+# OOF predicted versus actual
+ggplot(OOF_preds, aes(x = ridership, y = .pred, group = model)) +
+  geom_point(alpha = 0.3) +
+  geom_abline(linetype = "dashed", color = "red") +
+  geom_smooth(method = "lm", color = "blue") +
+  coord_equal() +
+  facet_wrap(~model, nrow = 2) +
+  theme_bw()
+
+
+# Aggregate predictions from Validation set
+val_preds <- rbind(data.frame(lm_val_pred_geo, model = "lm"),
+                   data.frame(glmnet_val_pred_geo, model = "glmnet"),
+                   data.frame(rf_val_pred_geo, model = "rf"),
+                   data.frame(xgb_val_pred_geo, model = "xgb")) %>% 
+  left_join(., input %>% dplyr::select(uniqueID) %>% 
+              rowid_to_column(var = ".row"), 
+            by = ".row") %>% 
+  group_by(model) %>%
+  mutate(ridership = log(ridership),
+         RMSE = yardstick::rmse_vec(ridership, .pred),
+         MAE  = yardstick::mae_vec(ridership, .pred),
+         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
+  ungroup() %>% 
+  mutate(model = factor(model, levels=c("lm","glmnet","rf","xgb")))
+
+# plot MAPE by model type
+ggplot(data = val_preds %>% 
+         dplyr::select(model, MAPE) %>% 
+         distinct() , 
+       aes(x = model, y = MAPE, group = 1)) +
+  geom_path(color = "red") +
+  geom_label(aes(label = paste0(round(MAPE,1),"%"))) +
+  theme_bw()
+
+# Validation Predicted vs. actual
+ggplot(val_preds, aes(x = ridership, y = .pred, group = model)) +
+  geom_point(alpha = 0.3) +
+  geom_abline(linetype = "dashed", color = "red") +
+  geom_smooth(method = "lm", color = "blue") +
+  coord_equal() +
+  facet_wrap(~model, nrow = 2) +
+  theme_bw()
+
+# join test data back to make spatial
+val_pred_sf <- val_preds %>% 
+  group_by(model) %>% 
+  rowwise() %>% 
+  mutate(RMSE = yardstick::rmse_vec(ridership, .pred),
+         MAE  = yardstick::mae_vec(ridership, .pred),
+         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
+  st_as_sf(., coords = c("Longitude", "Latitude"),
+           remove = FALSE,
+           crs = 4326)
+
+# map errors by point
+mapview(filter(val_pred_sf, model == "rf"), zcol = "MAPE")
+
+# aggregate val error to Neighborhood 
+val_MAPE_by_hood <- val_preds %>% 
+  group_by(Neighborhood, model) %>% 
+  summarise(RMSE = yardstick::rmse_vec(ridership, .pred),
+         MAE  = yardstick::mae_vec(ridership, .pred),
+         MAPE = yardstick::mape_vec(ridership, .pred)) %>% 
+  ungroup() 
+
+# plot MAPE by Hood
+ggplot(val_MAPE_by_hood, aes(x = reorder(Neighborhood, MAPE), y = MAPE)) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(breaks = seq(0,10,1)) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = -45, hjust = 0)
+  )
+
+## Fit and Extract final model
+## Final fit on all data, then extract model
+full_fit_lm     <- lm_best_wf %>% fit(ames)
+full_fit_glmnet <- glmnet_best_wf %>% fit(ames)
+full_fit_rf     <- rf_best_wf %>% fit(ames)
+full_fit_xgb    <- xgb_best_wf %>% fit(ames)
+
+predict(full_fit_rf, new_data = ames[3,]) %>% 
+  mutate(.pred_original = exp(.pred))
+
+
+# extract final model object
+lm_full_mod     <- full_fit_lm  $fit$fit$fit
+glmnet_full_mod <- full_fit_glmnet$fit$fit$fit
+rf_full_mod     <- full_fit_rf  $fit$fit$fit
+xgb_full_mod    <- full_fit_xgb $fit$fit$fit
+```

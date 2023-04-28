@@ -508,8 +508,6 @@ acs_ep <- get_acs(geography = "tract",
                   county = "El Paso", 
                   output = "wide") 
 
-#vec to not divide by sqkm
-dontdiv <- c("GEOID","NAME","medHHInc","grossRentPerInc","commuteToWork","geometry","area_sqmile")
 
 acs_ep <- acs_ep %>%
   rename(
@@ -534,7 +532,7 @@ acs_ep <- acs_ep %>%
     bachelorDeg = B06009_005E,
     professionalDeg = B06009_006E,
     disability = B10052_002E) %>%
-  dplyr::select(-c("B01001_001M", "B01001I_001M", "B02001_002M", "B02001_003M", "B02001_004M", "B02001_005M", "B02001_006M", "B02001_007M", "B02001_008M", "B19013_001M", "B25001_001M", "B25002_002M", "B25024_001M", "B25044_001M", "B28005_001M", "B28010_001M","B10052_002M", "B06009_002M", "B06009_003M", "B06009_004M", "B06009_005M", "B06009_006M"))
+  dplyr::select(-c("B01001_001M", "B01001I_001M", "B02001_002M", "B02001_003M", "B02001_004M", "B02001_005M", "B02001_006M", "B02001_007M", "B02001_008M", "B19013_001M", "B25001_001M", "B25002_002M", "B25024_001M", "B25044_001M", "B28005_001M", "B28010_001M","B10052_002M", "B06009_002M", "B06009_003M", "B06009_004M", "B06009_005M", "B06009_006M")) 
 
 
 # %>%
@@ -550,13 +548,15 @@ acs_ep1 <- acs_ep %>%
     blackPopPct = (blackPop/totalPop)*100,
     occupiedHUPct = (occupiedHU/totalHU)*100,
     vacantHUPct = ((totalHU-occupiedHU)/totalHU)*100
-  )
+  ) 
 
 
 acs_ep <- na.omit(acs_ep)
 
 st_crs(acs_ep) <- st_crs(el_paso)
-acs_ep <- st_intersection(acs_ep, el_paso)
+acs_ep <- st_intersection(acs_ep, el_paso) %>% 
+  dplyr::select(-c("NAME", "OBJECTID", "NAME.1", "GlobalID", "Shape_Length", "Shape_Area","B25044_001E"
+                 ))
 ```
 
 
@@ -802,16 +802,14 @@ tx_work <- tx_work %>%
     bachProfessionalWorkPct = (bachProfessional_work/total_jobs),
     maleWorkPct = (male_work/total_jobs),
     femaleWorkPct = (female_work/total_jobs)
-  )
+  ) %>%
+ dplyr::select(-starts_with("CF")) %>%
+  dplyr::select(-c("year", "state", "age_29_or_younger", "age_30_to_54", "age_55_or_older", "agriculture", "mining", "utilities", "construction", "manufacturing", "wholesaleTrade", "retailTrade", "transportationWarehousing", "informationTech", "financeInsurance", "realEstate", "techServices", "management", "wasteRemediation", "educational", "healthcareSocial", "artsEntertainmentRec", "foodServices", "otherJobs", "publicAdmin", "white_work", "black_work", "native_american_work", "asian_work", "pacific_work", "mixed_race_work", "not_hispanic_work", "hispanic_work", "underHS_work", "HS_work", "associate_work", "bachProfessional_work", "male_work", "female_work"))
 
-# <- left_join(acs_ep, tx_work, by=c('GEOID' = 'w_tract'))
-ep_work_census <- acs_ep
-#ep_work_census <- ep_work_census %>%
- # select(-starts_with("CF"))
+tx_work <- left_join(acs_ep%>% dplyr::select(GEOID) %>%  mutate(tract_id = nrow(.)), tx_work, by=c('GEOID' = 'w_tract'))
 
-ep_work_census_st <- ep_work_census %>% 
-  dplyr::select(-c("GEOID", "NAME", "OBJECTID", "NAME.1", "GlobalID", "Shape_Length", "Shape_Area","B25044_001E"
-                 ))
+
+
 
 ```
 
@@ -1191,7 +1189,7 @@ elpaso_outline <- el_paso %>%
   st_difference(exclude_area)
 
 hex <- st_make_grid(elpaso_outline, 
-                    cellsize = .01, 
+                    cellsize = .005, 
                     crs = 4269, 
                     square = F) %>% 
   st_sf() 
@@ -1278,45 +1276,41 @@ plot_grid(p1b,p1a,p1c, ncol=3)
 # ep_work_census <- ep_work_census %>%
 #   st_transform(crs=4269)
 
-census_lehd_hex <- st_interpolate_aw(ep_work_census_st, hex, extensive = T) %>%
+
+
+acs_ep_hex <- acs_ep %>% dplyr::select(-GEOID) %>% st_interpolate_aw(hex, extensive = T) %>%
+  mutate(uniqueID = rownames(.))
+  
+tx_work_hex <- tx_work %>%  dplyr::select(-GEOID) %>% st_interpolate_aw(hex, extensive = F) %>%
   mutate(uniqueID = rownames(.))
 
-  
-# census_lehd_hex <- hex %>% 
-#   st_centroid() %>% 
-#   st_join(ep_work_census, join=st_within) %>% 
-#   st_drop_geometry() %>% 
-#   full_join(., hex) %>% 
-#   st_sf()
-
 nwi_bg <- nwi_bg %>%
-  st_transform(crs=4269)
+  st_transform(crs=4269) %>%
+  mutate(nearestTransit = ifelse(nearestTransit == -99999.00, -1, nearestTransit),
+         destinationAccessibility = ifelse(destinationAccessibility == -99999, 0, destinationAccessibility)) 
 
 
-nwi_hex <- hex %>%
-  st_centroid() %>%
-  st_join(nwi_bg, join=st_within)%>% 
-  st_drop_geometry() %>% 
-  full_join(., hex) %>% 
-  st_sf()
+nwi_ext <- c("housingUnits","HH","jobAccessibility", "destinationAccessibility" )
+
+nwi_hex1 <- st_interpolate_aw(nwi_bg %>% dplyr::select(nwi_ext), hex, extensive = T) %>%
+  mutate(uniqueID = rownames(.))
+
+nwi_hex2 <- st_interpolate_aw(nwi_bg %>% dplyr::select(-nwi_ext), hex, extensive = F) %>%
+  mutate(uniqueID = rownames(.))
+
+
+nwi_hex <- left_join(nwi_hex1, nwi_hex2 %>% st_drop_geometry()) %>% st_sf()
 
 
 ```
 
 ```{r final hex begins}
 
-final_hex <- left_join(ridership_net_local, st_drop_geometry(census_lehd_hex), by = "uniqueID") %>% 
+final_hex <- left_join(ridership_net_local, st_drop_geometry(acs_ep_hex), by = "uniqueID") %>% 
+  left_join(st_drop_geometry(tx_work_hex), by = "uniqueID") %>% 
   left_join(st_drop_geometry(nwi_hex), by = "uniqueID") %>% 
   replace(is.na(.), 0)
 
-# final_hex <- final_hex %>%
-#   st_sf() %>%
-#   dplyr::select(-c("area_sqmile"))
-
-final_hex <- final_hex %>%
-  mutate(nearestTransit = ifelse(nearestTransit == -99999.00, -1, nearestTransit),
-         destinationAccessibility = ifelse(destinationAccessibility == -99999, 0, destinationAccessibility)) 
-# %>%  dplyr::select(-c("B25044_001E"))
 
 final_hex$uniqueID <- as.numeric(final_hex$uniqueID)
 ```
@@ -1482,7 +1476,13 @@ final_hex <- merge(final_hex, busbaysnet %>% st_drop_geometry(), by = "uniqueID"
 
 final_hex <- final_hex %>% dplyr::select(-contains('CF')) 
 
-final_hex <- final_hex %>% filter(!uniqueID %in% c(188, 365))
+
+
+
+
+#641,1234
+
+final_hex <- final_hex %>% filter(!uniqueID %in% c(641,1234))
 #$mega_bay <- ifelse(final_hex$uniqueID %in% c(188, 365),1,0)
 
 #trying to get spatial smoothing
@@ -1556,12 +1556,12 @@ model_rec <- recipe(ridership ~ ., data = ep_train) %>%
 # See the data after all transformations
 #glimpse(model_rec %>% prep() %>% juice())
 
-rf_plan <- rand_forest() %>%
-  set_args(mtry  = tune()) %>%
-  set_args(min_n = tune()) %>%
-  set_args(trees = 2000) %>% 
-  set_engine("ranger", importance = "impurity") %>% 
-  set_mode("regression")
+# rf_plan <- rand_forest() %>%
+#   set_args(mtry  = tune()) %>%
+#   set_args(min_n = tune()) %>%
+#   set_args(trees = 2000) %>% 
+#   set_engine("ranger", importance = "impurity") %>% 
+#   set_mode("regression")
 
 XGB_plan <- boost_tree() %>%
   set_args(mtry  = tune()) %>%
@@ -1579,10 +1579,10 @@ xgb_grid <- expand.grid(mtry = seq(10,100,20),
 
 
 # create workflow
-rf_wf <-
-  workflow() %>% 
-  add_recipe(model_rec) %>% 
-  add_model(rf_plan)
+# rf_wf <-
+#   workflow() %>% 
+#   add_recipe(model_rec) %>% 
+#   add_model(rf_plan)
 
 xgb_wf <-
   workflow() %>% 
@@ -1604,12 +1604,12 @@ cl <- makePSOCKcluster(all_cores)
 registerDoParallel(cl)
 
 
-rf_tuned <- rf_wf %>%
-  tune::tune_grid(.,
-                  resamples = cv_splits_geo,
-                  grid      = rf_grid,
-                  control   = control,
-                  metrics   = metrics)
+# rf_tuned <- rf_wf %>%
+#   tune::tune_grid(.,
+#                   resamples = cv_splits_geo,
+#                   grid      = rf_grid,
+#                   control   = control,
+#                   metrics   = metrics)
 
 xgb_tuned <- xgb_wf %>%
   tune::tune_grid(.,
@@ -1623,11 +1623,11 @@ xgb_tuned <- xgb_wf %>%
 ```{r }
 ## 'Best' by some metric and margin
 
-rf_best_params     <- select_best(rf_tuned, metric = "rmse")
+# rf_best_params     <- select_best(rf_tuned, metric = "rmse")
 xgb_best_params    <- select_best(xgb_tuned, metric = "rmse")
 
 ## Final workflow
-rf_best_wf     <- finalize_workflow(rf_wf, rf_best_params)
+# rf_best_wf     <- finalize_workflow(rf_wf, rf_best_params)
 xgb_best_wf    <- finalize_workflow(xgb_wf, xgb_best_params)
 
 ```
@@ -1636,10 +1636,10 @@ xgb_best_wf    <- finalize_workflow(xgb_wf, xgb_best_params)
 
 # last_fit() emulates the process where, after determining the best model, the final fit on the entire training set is needed and is then evaluated on the test set.
 
-rf_val_fit_geo <- rf_best_wf %>% 
-  last_fit(split     = data_split,
-           control   = control,
-           metrics   = metrics)
+# rf_val_fit_geo <- rf_best_wf %>% 
+#   last_fit(split     = data_split,
+#            control   = control,
+#            metrics   = metrics)
 
 xgb_val_fit_geo <- xgb_best_wf %>% 
   last_fit(split     = data_split,
@@ -1650,30 +1650,30 @@ xgb_val_fit_geo <- xgb_best_wf %>%
 
 ```{r}
 
-#random forest
-full_fit_rf <- rf_best_wf %>% fit(input)
-
-output_rf <- input
-
-output_rf$pred <- predict(full_fit_rf, new_data = input) %>% exp()
-
-output_rf <- output_rf  %>% 
-  mutate(error = pred$.pred - ridership,
-         uniqueID = as.character(uniqueID))
-
-
-output_rf_sf <- left_join(output_rf, hex) %>% st_sf()
-
-p1<-ggplot(output_rf_sf)+
-  geom_sf(aes(fill = error), color =NA)
-
-
-
-
-p2<-full_fit_rf %>% 
-  extract_fit_parsnip() %>% 
-  vip(num_features = 30)
-grid.arrange(p1,p2, ncol = 2)
+# #random forest
+# full_fit_rf <- rf_best_wf %>% fit(input)
+# 
+# output_rf <- input
+# 
+# output_rf$pred <- predict(full_fit_rf, new_data = input) %>% exp()
+# 
+# output_rf <- output_rf  %>% 
+#   mutate(error = pred$.pred - ridership,
+#          uniqueID = as.character(uniqueID))
+# 
+# 
+# output_rf_sf <- left_join(output_rf, hex) %>% st_sf()
+# 
+# p1<-ggplot(output_rf_sf)+
+#   geom_sf(aes(fill = error), color =NA)
+# 
+# 
+# 
+# 
+# p2<-full_fit_rf %>% 
+#   extract_fit_parsnip() %>% 
+#   vip(num_features = 30)
+# grid.arrange(p1,p2, ncol = 2)
 ```
 
 
@@ -1725,10 +1725,10 @@ grid.arrange(ncol = 2, p1,p2)
 xgb_mae <- sum(abs(output_xgb$error))/nrow(output_xgb)
 
 
-rf_mae <- sum(abs(output_rf$error))/nrow(output_rf)
+#rf_mae <- sum(abs(output_rf$error))/nrow(output_rf)
 
-models_mae <- data.frame(model = c("Random Forest", "XG Boost"),
-                         mae = c(rf_mae, xgb_mae))
+models_mae <- data.frame(model = c("XG Boost"),
+                         mae = c(xgb_mae))
 
 models_mae %>% gt()
 ```
@@ -1745,7 +1745,7 @@ ggplot(output_xgb_sf)+
 
 ```{r export hex with prediction}
 output_xgb_sf <- output_xgb_sf 
-#st_write(output_xgb_sf, 'final_hex2.geojson', overwrite = T, append = F)
+st_write(output_xgb_sf, 'final_hex3.geojson', overwrite = T, append = F)
 ```
 
 ## validating models
