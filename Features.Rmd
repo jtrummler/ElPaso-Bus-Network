@@ -292,7 +292,3 @@ ggplot()+
 
 ## Open Street Map
 
-```{r}
-osm <- osmdata::osmdata_sf(el_paso)
-```
-

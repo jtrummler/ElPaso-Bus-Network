@@ -1884,11 +1884,7 @@ Fichman for their invaluable mentorship throughout this process.</p>
 </div>
 <div id="introduction-and-use-case" class="section level2">
 <h2>Introduction and Use Case</h2>
-<div class="figure">
-<img src="%22C:/Users/jtrum/Desktop/MUSA8010/imgs/img1.PNG%22" alt />
-<p class="caption">Image Credit: El Paso Capital Improvements
-Division</p>
-</div>
+<pre class="r"><code>knitr::include_graphics(&quot;images/img1.png&quot;)</code></pre>
 <blockquote>
 <p>“El Paso, often forgotten, is building a stronger transit network
 than most US cities.” Christof Spieler (Trains, Buses, People)</p>
@@ -1933,11 +1929,11 @@ Department is looking to invest a certain percentage of annual funds
 toward under-resourced areas. Our group defined equity as both the
 ability for all El Paso residents to have reasonable access to a bus
 stop while prioritizing transit-dependent populations.</p>
-<p>Thus, we are building a two-pronged informational network for our
-client. This includes:</p>
+<p>Thus, we are building a two-pronged project for our client. This
+includes:</p>
 <p><strong>Latent bus transit demand model:</strong> We are predicting
 bus transit ridership based on 2022 ridership to model demand for
-transit services.</p>
+transit services in the future. We are building correlative</p>
 <p><strong>Informational Network:</strong> A scoring network to assess
 ridership on equity and revenue based indicators.</p>
 </div>
@@ -2370,6 +2366,8 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   |                                                                            
   |                                                                      |   0%
   |                                                                            
+  |                                                                      |   1%
+  |                                                                            
   |=                                                                     |   1%
   |                                                                            
   |=                                                                     |   2%
@@ -2416,6 +2414,8 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   |                                                                            
   |============                                                          |  17%
   |                                                                            
+  |============                                                          |  18%
+  |                                                                            
   |=============                                                         |  18%
   |                                                                            
   |=============                                                         |  19%
@@ -2434,13 +2434,19 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   |                                                                            
   |=================                                                     |  25%
   |                                                                            
+  |==================                                                    |  25%
+  |                                                                            
   |==================                                                    |  26%
   |                                                                            
   |===================                                                   |  27%
   |                                                                            
   |===================                                                   |  28%
   |                                                                            
+  |====================                                                  |  28%
+  |                                                                            
   |====================                                                  |  29%
+  |                                                                            
+  |=====================                                                 |  29%
   |                                                                            
   |=====================                                                 |  30%
   |                                                                            
@@ -2451,8 +2457,6 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   |=======================                                               |  32%
   |                                                                            
   |=======================                                               |  33%
-  |                                                                            
-  |=======================                                               |  34%
   |                                                                            
   |========================                                              |  34%
   |                                                                            
@@ -2492,8 +2496,6 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   |                                                                            
   |=================================                                     |  47%
   |                                                                            
-  |=================================                                     |  48%
-  |                                                                            
   |==================================                                    |  48%
   |                                                                            
   |==================================                                    |  49%
@@ -2505,8 +2507,6 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   |====================================                                  |  51%
   |                                                                            
   |====================================                                  |  52%
-  |                                                                            
-  |=====================================                                 |  52%
   |                                                                            
   |=====================================                                 |  53%
   |                                                                            
@@ -2552,6 +2552,8 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   |                                                                            
   |===============================================                       |  68%
   |                                                                            
+  |================================================                      |  68%
+  |                                                                            
   |================================================                      |  69%
   |                                                                            
   |=================================================                     |  70%
@@ -2562,6 +2564,8 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   |                                                                            
   |==================================================                    |  72%
   |                                                                            
+  |===================================================                   |  72%
+  |                                                                            
   |===================================================                   |  73%
   |                                                                            
   |====================================================                  |  74%
@@ -2571,6 +2575,8 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   |=====================================================                 |  75%
   |                                                                            
   |=====================================================                 |  76%
+  |                                                                            
+  |======================================================                |  76%
   |                                                                            
   |======================================================                |  77%
   |                                                                            
@@ -2588,19 +2594,17 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   |                                                                            
   |=========================================================             |  82%
   |                                                                            
-  |==========================================================            |  82%
-  |                                                                            
   |==========================================================            |  83%
   |                                                                            
   |===========================================================           |  84%
-  |                                                                            
-  |===========================================================           |  85%
   |                                                                            
   |============================================================          |  85%
   |                                                                            
   |============================================================          |  86%
   |                                                                            
   |=============================================================         |  87%
+  |                                                                            
+  |=============================================================         |  88%
   |                                                                            
   |==============================================================        |  88%
   |                                                                            
@@ -2633,6 +2637,8 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   |===================================================================== |  98%
   |                                                                            
   |===================================================================== |  99%
+  |                                                                            
+  |======================================================================|  99%
   |                                                                            
   |======================================================================| 100%</code></pre>
 <pre class="r"><code>acs.2020 &lt;- acs.2020 %&gt;%

@@ -37,7 +37,6 @@ library(FNN)
 install.packages("set_engine")
 library(gt)
 library(recipes)
-library(set_engine)
 
 devtools::install_github("jamgreen/lehdr")
 
@@ -148,10 +147,10 @@ elpaso <- get_acs(geography = "tract",
                              output = "wide") 
 
 #vec to not divide by sqkm
-dontdiv<- c("GEOID","NAME","medHHInc","grossRentPerInc","commuteToWork","geometry","area_sqmile")
+dontdiv <- c("GEOID","NAME","medHHInc","grossRentPerInc","commuteToWork","geometry","area_sqmile")
 
 elpaso <- elpaso %>%
-rename(
+  rename(
   totalPop = B01001_001E, 
   hlPop = B01001I_001E, 
   whitePop = B02001_002E, 
@@ -173,45 +172,59 @@ rename(
   bachelorDeg = B06009_005E,
   professionalDeg = B06009_006E,
   disability = B10052_002E) %>%
-    mutate(area_sqmile = st_area(geometry)/2590000
-         ) %>%  st_as_sf(crs = 4269) %>%
+  mutate(area_sqmile = st_area(geometry)/2590000) %>%  
+  st_as_sf(crs = 4269) %>%
   mutate_at(vars(-dontdiv), funs(as.numeric(./area_sqmile)))
 
+elpaso <- elpaso[, !(startsWith(names(elpaso), "B0") | 
+                       startsWith(names(elpaso), "B1") | 
+                       startsWith(names(elpaso), "B2"))]
 
 ```
 
 ```{r make_hex_net}
-busroutes <-  read_sf(paste(data_folder, "/transit_lines.geojson", sep = '')) %>% st_transform(crs = 4269)
+busroutes <-  read_sf(paste(data_folder, "/transit_lines.geojson", sep = '')) %>% 
+  st_transform(crs = 4269)
 
-roads <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = '')) %>% st_transform(crs = 4269)
+roads <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = '')) %>% 
+  st_transform(crs = 4269)
 
 #ask alex about this map
 
 
-futureLU <- read_sf(paste(data_folder, "/FutureLandUse.shp", sep = '')) %>% st_transform(crs = 4269)  
+futureLU <- read_sf(paste(data_folder, "/FutureLandUse.shp", sep = '')) %>% 
+  st_transform(crs = 4269)  
 
-futureLU_crop <- futureLU %>% st_crop(y = st_bbox(busroutes))
+futureLU_crop <- futureLU %>% 
+  st_crop(y = st_bbox(busroutes))
 
- ggplot()+
-    geom_sf(data = futureLU, aes(fill = COMMENTS), color = NA)+
-    geom_sf(data = roads)+
-    geom_sf(data = busroutes, color = 'red')+
-   mapTheme+
-   labs(fill = 'Future Land Use', title = 'Deciding which areas to include in our model')
+ggplot()+
+  geom_sf(data = futureLU, aes(fill = COMMENTS), color = NA)+
+  geom_sf(data = roads)+
+  geom_sf(data = busroutes, color = 'red')+
+  mapTheme+
+  labs(fill = 'Future Land Use', 
+       title = 'Deciding which areas to include in our model')
  
 
 
-excludeLU <- c("Fort Bliss Military","Fort Bliss Mixed Use (Airport)","Preserve","Industrial and/or Railyards","Remote","Military Reserve")
-
+excludeLU <- c("Fort Bliss Military",
+               "Fort Bliss Mixed Use (Airport)",
+               "Preserve",
+               "Industrial and/or Railyards",
+               "Remote",
+               "Military Reserve")
 
 exclude_area <-  futureLU_crop %>% filter(COMMENTS %in% excludeLU) %>% st_union()
 
+elpaso_outline <- elpaso %>% 
+  st_union() %>% 
+  st_sf() %>% 
+  st_crop(y = st_bbox(busroutes)) %>% 
+  st_difference(exclude_area)
 
-
-elpaso_outline <- elpaso %>% st_union() %>% st_sf() %>% st_crop(y = st_bbox(busroutes)) %>% st_difference(exclude_area)
-
-
-hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F) %>% st_sf() 
+hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F) %>% 
+  st_sf() 
 
 hex <- hex[elpaso_outline,] %>%
   mutate(uniqueID = rownames(.))
@@ -230,34 +243,32 @@ riderstops_sf <- read_csv(paste(data_folder, "/riderstops1.csv", sep = '')) %>%
   filter(!is.na(stop_lat)) %>%
   st_as_sf(coords = c('stop_lon', 'stop_lat'), crs = 4269) 
 
+stop_riders_agg <- riderstops_sf %>% 
+  group_by(TP, RT) %>% 
+  summarise(ridership = sum(Ons) + sum(Offs))
 
+stop_riders_agg_noBRT <- stop_riders_agg %>% 
+  filter(! RT %in% c(205,206,207,208))
+stop_riders_agg_BRT <- stop_riders_agg %>% 
+  filter(RT %in% c(205,206,207,208))
 
-stop_riders_agg <- riderstops_sf %>% group_by(TP, RT) %>% summarise(ridership = sum(Ons) + sum(Offs))
-
-
-stop_riders_agg_noBRT <- stop_riders_agg %>% filter(! RT %in% c(205,206,207,208))
-stop_riders_agg_BRT <- stop_riders_agg %>% filter(RT %in% c(205,206,207,208))
-
-ridership_net_local <- stop_riders_agg_noBRT %>% 
+ridership_net_local <- stop_riders_agg_noBRT %>% # Local Bus RT ridership
   dplyr::select(ridership) %>% 
   aggregate(., hex, sum) %>%
   mutate(ridership = replace_na(ridership, 0),
          uniqueID = rownames(.))
 
-ridership_net_all <- stop_riders_agg %>% 
+ridership_net_all <- stop_riders_agg %>% # BRIO RT Ridership
   dplyr::select(ridership) %>% 
   aggregate(., hex, sum) %>%
   mutate(ridership = replace_na(ridership, 0),
          uniqueID = rownames(.))
 
-
-ridership_net_BRT <- stop_riders_agg_BRT %>% 
+ridership_net_BRT <- stop_riders_agg_BRT %>%  # Total Ridership
   dplyr::select(ridership) %>% 
   aggregate(., hex, sum) %>%
   mutate(ridership = replace_na(ridership, 0),
          uniqueID = rownames(.))
-
-
 
 p1a <- ridership_net_local %>%
   ggplot()+
@@ -276,7 +287,6 @@ p1b <- ridership_net_all %>%
   theme(legend.position = 'right')+
   mapTheme
 
-
 p1c <- ridership_net_BRT %>%
   ggplot()+
   geom_sf(aes(fill = ridership), color =NA)+
@@ -285,8 +295,7 @@ p1c <- ridership_net_BRT %>%
   theme(legend.position = 'right')+
   mapTheme
 
-plot_grid(p1a,p1b, p1c)
-
+plot_grid(p1b,p1a,p1c, ncol=3)
 ```
 
 
@@ -296,8 +305,13 @@ plot_grid(p1a,p1b, p1c)
 #https://lehd.ces.census.gov/data/lodes/LODES7/LODESTechDoc7.5.pdf
 
 #get lhodes work place data
-tx_work <- grab_lodes(state = "tx", year = 2019, lodes_type = "wac", job_type = "JT01", 
-                    segment = "S000", state_part = "main", agg_geo = "tract") %>% 
+tx_work <- grab_lodes(state = "tx", 
+                      year = 2019, 
+                      lodes_type = "wac", 
+                      job_type = "JT01", 
+                      segment = "S000", 
+                      state_part = "main", 
+                      agg_geo = "tract") %>% 
   rename(total_jobs = C000,
          age_29_or_younger = CA01,
          age_30_to_54 = CA02,
@@ -334,17 +348,22 @@ tx_work <- grab_lodes(state = "tx", year = 2019, lodes_type = "wac", job_type = 
          not_hispanic_work = CT01,
          hispanic_work = CT02,
          male_work = CS01,
-         female_work = CS02) %>% select(-starts_with("C"))
-#merge to census tracts data
-elpaso_work <- left_join(elpaso, tx_work, by = c('GEOID' = 'w_tract')) %>% st_sf() %>%
+         female_work = CS02)
+
+tx_work <- tx_work %>%
+  dplyr::select(-starts_with("C"))
+
+elpaso_work <- left_join(elpaso, tx_work, by = c('GEOID' = 'w_tract')) %>% 
+  st_sf() %>%
   mutate_at(colnames(tx_work)[4:length(colnames(tx_work))], funs(as.numeric(./area_sqmile)))
 
 #add to hex
-census_hex <- hex %>% st_centroid() %>% st_join(elpaso_work, join=st_within) %>% 
+census_lehd_hex <- hex %>% 
+  st_centroid() %>% 
+  st_join(elpaso_work, join=st_within) %>% 
   st_drop_geometry() %>% 
-  full_join(., hex) %>% st_sf()
-
-
+  full_join(., hex) %>% 
+  st_sf()
 ```
 
 ```{r}
@@ -359,17 +378,21 @@ census_hex <- hex %>% st_centroid() %>% st_join(elpaso_work, join=st_within) %>%
 
 
 ```{r walkabiity features}
-walkscore <- read_sf(paste(data_folder, "/nwi_bg.geojson", sep = '')) %>% rename(
+walkscore <- read_sf(paste(data_folder, "/nwi_bg.geojson", sep = '')) %>% 
+  rename(
   totalPop_walk = totalPop
 )
 
-walk_hex <- hex %>% st_centroid() %>% st_join(walkscore, join=st_within)
+walk_hex <- hex %>% 
+  st_centroid() %>% 
+  st_join(walkscore, join=st_within)
 
 ```
 
 ```{r make final hex}
-final_hex <- left_join(ridership_net_local, st_drop_geometry(census_hex), by = "uniqueID") %>% 
-  left_join(st_drop_geometry(walk_hex), by = "uniqueID") %>% replace(is.na(.), 0)
+final_hex <- left_join(ridership_net_local, st_drop_geometry(census_lehd_hex), by = "uniqueID") %>% 
+  left_join(st_drop_geometry(walk_hex), by = "uniqueID") %>% 
+  replace(is.na(.), 0)
 
 ```
 
@@ -404,13 +427,23 @@ plot_grid(scat, map, rel_widths = c(1,1.3))
 
 ```{r aggregating vars}
 
-lhodes_vars <-c(colnames(tx_work)[5:length(colnames(tx_work))])
+lhodes_vars <- c(colnames(tx_work)[5:length(colnames(tx_work))])
 
+elpaso <- elpaso[, !(names(elpaso) %in% c("GEOID", "NAME", "area_sqmile"))]
 
-census_vars <- elpaso %>% select(!starts_with('B') & ! c("GEOID","NAME","area_sqmile")) %>% st_drop_geometry() %>% colnames()
-walkscore_vars <- c()
+census_vars <- elpaso %>%
+  st_drop_geometry() %>% 
+  colnames()
 
-final_hex <- final_hex %>% select(ridership, lhodes_vars, census_vars, walkscore_vars, geometry) %>% st_sf()
+walkscore <- walkscore[, !(names(walkscore) %in% c("GEOID", "NAME", "variable", "estimate", "moe"))]
+
+walkscore_vars <- walkscore %>%
+  st_drop_geometry() %>%
+  colnames()
+
+final_hex <- final_hex %>% 
+  select(ridership, lhodes_vars, census_vars, walkscore_vars, geometry) %>% 
+  st_sf()
 
 
 ```
@@ -510,7 +543,11 @@ final_hex <- final_hex %>% select(ridership, lhodes_vars, census_vars, walkscore
 set.seed(13)
 
 
-input <- final_hex %>% st_drop_geometry() %>% mutate(cvID = sample(round(nrow(final_hex) / 24), size=nrow(final_hex), replace = TRUE) )
+input <- final_hex %>% 
+  st_drop_geometry() %>% 
+  mutate(cvID = sample(round(nrow(final_hex) / 24), 
+                       size=nrow(final_hex), 
+                       replace = TRUE) )
 
 ### Initial Split for Training and Test
 data_split <- initial_split(input, strata = "ridership", prop = 0.75)

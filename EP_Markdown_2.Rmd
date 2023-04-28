@@ -130,6 +130,20 @@ mapTheme <- theme(
   panel.border = element_rect(colour = "black", fill=NA, size=2)
 ) 
 
+mapTheme2 <- theme(
+  text = element_text( color = "black"),
+  plot.title = element_text(size = 14,colour = "black"),
+  plot.subtitle=element_text(face="italic"),
+  plot.caption=element_text(hjust=0),
+  axis.ticks = element_blank(),
+  panel.background = element_blank(),axis.title = element_blank(),
+  axis.text = element_blank(),
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "white", fill=NA, size=2)
+) 
+
 plotTheme <- theme(
   text = element_text( color = "black"),
   plot.title = element_text(size = 14,colour = "black"),
@@ -141,6 +155,19 @@ plotTheme <- theme(
   #axis.text = element_blank(),
   panel.grid.minor = element_blank(),
   panel.border = element_rect(colour = "black", fill=NA, size=2)
+) 
+
+plotTheme2 <- theme(
+  text = element_text( color = "black"),
+  plot.title = element_text(size = 14,colour = "black"),
+  plot.subtitle=element_text(face="italic"),
+  plot.caption=element_text(hjust=0),
+  #axis.ticks = element_blank(),
+  panel.background = element_blank(),
+  #axis.title = element_blank(),
+  #axis.text = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "white", fill=NA, size=2)
 ) 
 palette8 <- c("#6F503E", "#F19179", "#F8AA60", "#A8A16A", "#A2B8E1", "#B898A5", "#9DA79F", "black")
 
@@ -158,7 +185,6 @@ options(scipen=999)
 
 ```{r files and features, include=FALSE}
 # Ridership Data from client
-ridership <- read.csv(paste(data_folder, "/ridership.csv", sep = ''))
 riderstops <- read.csv(paste(data_folder, "/riderstops1.csv", sep = ''))
 
 # Transit Lines
@@ -187,6 +213,8 @@ roads <- read_sf(paste(data_folder, "/roads_filtered.geojson", sep = ''))
 road_centerlines <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = '')) %>%
   dplyr::filter(MUNL == "EL PASO")
 
+roads_EP <- st_intersection(el_paso, road_centerlines)
+
 # FLUM
 flum <- read_sf(paste(data_folder, "/FutureLandUse.geojson", sep = ''))
 
@@ -194,7 +222,10 @@ flum <- read_sf(paste(data_folder, "/FutureLandUse.geojson", sep = ''))
 schools <- read_sf(paste(data_folder, "/Schools.geojson", sep = ''))
 
 # Rio Grande
-rio <- read_sf(paste(data_folder, "/RioGrande.geojson", sep = ''))
+rio <- read_sf(paste(data_folder, "/RioGrande.geojson", sep = '')) %>%
+  st_union()
+
+st_sf(geometry = rio)
 
 # Franklin Mtns.
 franklin <- read_sf(paste(data_folder, "/FranklinMountainStatePark.geojson", sep = ''))
@@ -209,6 +240,28 @@ osm <- read_sf(paste(data_folder, "/export.geojson", sep = ''))
 # Local Transit Bays
 local_transit_bays <- read_sf(paste(data_folder, "/local_transit_bays.csv", sep = '')) %>%
   st_as_sf(coords = c('lon', 'lat'), crs = 4269)
+
+# Different Geographies 
+tx <- counties("TX") # STATE OF TX #
+
+ep_co <- tx %>%
+  dplyr::filter(COUNTYFP == 141) # COUNTY OF EL PASO #
+
+# BLOCK GROUPS #
+ep_blocks <- block_groups("TX", year=2019) %>%
+  dplyr::filter(COUNTYFP == 141) %>%
+  st_transform(st_crs(el_paso)) %>%
+  st_intersection(el_paso, ep_blocks) %>%
+  mutate(area_sqmile = (ALAND + AWATER)/2590000) %>%
+  dplyr::select(c("GEOID", "area_sqmile", "geometry"))
+
+# TRACTS #
+ep_tracts <- tracts("TX", year=2019) %>%
+  dplyr::filter(COUNTYFP == 141) %>%
+  st_transform(st_crs(el_paso)) %>%
+  st_intersection(el_paso, ep_blocks) %>%
+  mutate(area_sqmile = (ALAND + AWATER)/2590000) %>%
+  dplyr::select(c("GEOID", "area_sqmile", "geometry"))
 ```
 
 ## Acknowledgement
@@ -217,11 +270,8 @@ This project was created by Charlie Huemmler, Yingxue Ou, and Jack Rummler as pa
 
 ## Introduction and Use Case
 
-![Image Credit: El Paso Capital Improvements Division]("C:/Users/jtrum/Desktop/MUSA8010/imgs/img1.PNG")
-
->   "El Paso, often forgotten, is building a stronger transit network than most US cities." 
+>   "El Paso, often forgotten, is building a stronger transit network than most US cities."  
 >   Christof Spieler (Trains, Buses, People) 
-
 
 Transit ridership is often a key metric to assess the efficiency of public transportation systems. Like many transit agencies in the last decade, there has been annual decreases in transit ridership, with the sharpest decline in ridership at the beginning of the COVID-19 pandemic. While many transit agencies are finally beginning to see comparable transit ridership now as compared to pre-2020, transit agencies are still grappling with how to maintain existing riders and lure new riders through trustworthy and connected service.
 
@@ -235,59 +285,95 @@ Now, Sun Metro experiences about 63% of pre-pandemic ridership numbers, but the 
 
 The balance between equity and revenue can often be a challenge for transit agencies to balance. While agencies want to provide access to transit for all of its residents, and particularly those who may be transit-dependent for all of their trips, this means placing bus stops in under-resourced neighborhoods that may not be profitable for the agency. Our client revealed that the El Paso Capital Improvements Department is looking to invest a certain percentage of annual funds toward under-resourced areas. Our group defined equity as both the ability for all El Paso residents to have reasonable access to a bus stop while prioritizing transit-dependent populations.
 
-Thus, we are building a two-pronged project for our client. This includes:
-
-**Latent bus transit demand model:** We are predicting bus transit ridership based on 2022 ridership to model demand for transit services in the future. We are building correlative
-
-**Informational Network:** A scoring network to assess ridership on equity and revenue based indicators.
-
-
-## El Paso Context
-
-Sun Metro is the transportation provider in the city of El Paso, Texas. Sun Metro has made several expansions in the past decade, most notably adding four bus rapid transit (BRT) lines, adding the streetcar network, and a new transit center. With many transit agencies in the last decade, there has been a yearly decrease in bus ridership, with a sharp decrease at the start of the COVID-19 pandemic. Now, Sun Metro experiences about 63% of pre-pandemic ridership numbers, but the agency is looking to explore the implications of new bus transit services.
-
-El Paso is the sixth-largest city in Texas located at the far western tip of the state, just immediately north of Ciudad Juárez. The city is bounded by the Rio Grande River to the south, the Franklin Mountain Range to the north, and Fort Bliss Military Base to the northeast. The context map below shows the geographical constraints where the Franklin Mountains are represented in light green, Fort Bliss Military Base in dark green, and the Rio Grande River in light blue, overlain on top of population density of the city at a census tract level. As we can see, downtown El Paso is notched in between the mountains and river, with heavy sprawl toward the north and east.
-
-<superbigimage>
-```{r context map, warning=FALSE, message=FALSE, results=FALSE}
-plot <- ggplot() +
-  geom_sf(data=el_paso, fill="grey") +
-  geom_sf(data=rio, fill="skyblue", color="skyblue", size=500) +
-  geom_sf(data=franklin, fill="darkgreen", color="darkgreen", alpha=0.7) +
-  geom_sf(data=ft_bliss, fill="limegreen", color="limegreen", alpha=0.7) +
-  labs(title="El Paso, Texas",
-       subtitle="Context Map",
-       caption="City limits in grey \nRio Grande River in blue \nFranklin Mountains in dark green \nFort Bliss Military Reserve in lime green")+
-  mapTheme
-
-plot
-```
-</superbigimage>
-
-
-
 ## Methodology
 
 For this project, we are building a latent bus transit demand model. From the data we are supplied of on-boarding and off-boarding per route, stop, and day, we built a model to predict bus transit ridership. How this gets completed is through training our model on an 80% subset of our data and testing it on 20% of our data to receive predicted ridership. 
 
 Our data is aggregated to hexbins, which are equally shaped hexbins that act as an overlay on top of the city of El Paso boundary. Total ridership is aggregated into each hexbin to predict what the total ridership is based on the features engineered into our model. We are building three models: a logistic regression model, a Random Forest model, and an XGBoost model.
-3
+
 We are building this model to inform our client's interest in knowing how bus transit alternative routes will affect route-level and system-level equity and fare revenue implications. In our model, we bake in equity metrics, which highlight the ability for transit-dependent populations to have operable, efficient service, in addition to the accessibility of stops for all El Paso residents. Fare revenue optimization is derived from how profit can be increased based upon new ridership patterns. If our model can accurately predict bus transit ridership, it can inform how new transit routes perform on these indicators, which the web application we develop will evaluate.
 
 Thus, this project is two-fold: a predictive bus transit ridership model and a performance-based measurement evaluating the equity and financial implications of transit demand.
+**Latent bus transit demand model:** We are predicting bus transit ridership based on 2022 ridership to model demand for transit services in the future. We are building correlative
+
+**Informational Network:** A scoring network to assess ridership on equity and revenue based indicators.
 
 # Exploratory Data Analysis
+
+## El Paso Context
+
+El Paso is the sixth-largest city in Texas located at the far western tip of the state, just immediately north of Ciudad Juárez. The city is bounded by the Rio Grande River to the south, the Franklin Mountain Range to the north, and Fort Bliss Military Base to the northeast. The context map below shows the geographical constraints where the Franklin Mountains are represented in light green, Fort Bliss Military Base in dark green, and the Rio Grande River in light blue, overlain on top of population density of the city at a census tract level. As we can see, downtown El Paso is notched in between the mountains and river, with heavy sprawl toward the north and east.
+
+```{r context_map, warning=FALSE, message=FALSE, results=FALSE}
+ep_bus_routes <- st_intersection(el_paso, bus_routes)
+
+grid.arrange(ncol=2,
+ggplot()+
+  geom_sf(data=tx, fill='grey', color='black', size=0.5)+
+  geom_sf(data=ep_co, fill=palette6[2])+
+  theme(panel.background = element_rect(fill = "white"))+
+  mapTheme2,
+ggplot() +
+  geom_sf(data=ep_co, fill=palette6[2], color=palette6[2]) +
+  geom_sf(data=el_paso, fill="grey", color='grey') +
+  geom_sf(data=rio, color="blue", fill='blue', size=5000) +
+  geom_sf(data=franklin, fill=palette6[6], color=palette6[6]) +
+  geom_sf(data=ft_bliss, fill=palette6[4], color=palette6[4]) +
+  geom_sf(data=bus_routes, color="black") +
+  labs(caption="El Paso (county) in pink\nEl Paso (city) in grey\nRio Grande River in blue\nFranklin Mountains State Park in purple\nFort Bliss Military Base in olive\nCurrent bus network in black")+
+  mapTheme,
+top="Context Map - El Paso, TX"
+)
+```
+
+## Current Local Bus Network
+
+In our model, we are primarily focusing on local bus routes. Out of the 56 existing routes, 31 of them are deemed local routes.
+
+```{r}
+grid.arrange(ncol=2,
+ggplot()+
+  geom_sf(data=tx, fill='grey', color='black', size=0.5)+
+  geom_sf(data=ep_co, fill=palette6[2])+
+  theme(panel.background = element_rect(fill = "white"))+
+  mapTheme2,
+ggplot() +
+  geom_sf(data=ep_co, fill=palette6[2], color=palette6[2]) +
+  geom_sf(data=el_paso, fill="grey", color='grey') +
+  geom_sf(data=rio, color="blue", fill='blue', size=5000) +
+  geom_sf(data=franklin, fill=palette6[6], color=palette6[6]) +
+  geom_sf(data=ft_bliss, fill=palette6[4], color=palette6[4]) +
+  geom_sf(data=bus_routes, color="black") +
+  geom_sf(data=local, color="red")+
+  #labs(caption="El Paso (county) in pink\nEl Paso (city) in grey\nRio Grande River in blue\nFranklin Mountains State Park in purple\nFort Bliss Military Base in olive\nCurrent bus network in black")+
+  mapTheme,
+top="Context Map - El Paso, TX"
+)
+```
+
+
+```{r context map, warning=FALSE, message=FALSE, results=FALSE}
+acs_ep.popDense <- acs_ep %>%
+  dplyr::select(c("totalPop", "geometry")) %>%
+  st_transform(st_crs(el_paso))
+acs_ep.popDense <- st_intersection(acs_ep.popDense, el_paso)
+
+ggplot()+
+  geom_sf(data=acs_ep.popDense, aes(fill=q5(totalPop)), color=NA)+
+  scale_fill_manual(values = rev(palette5cont), 
+                     labels = (qBr(acs_ep.popDense, "totalPop")),
+                    name="Quintile\nBreaks") +
+  labs(title="Total Local Ridership by Census Tract",
+       subtitle="El Paso, TX (2022)")+
+  mapTheme
+ 
+```
 
 Our client has provided us with a CSV file containing ridership data for the year 2022. The data was collected using sensors that recorded the number of on-board and off-board passengers at each stop and route on a daily basis. Approximately 85% of buses were equipped with these sensors, and they were rotated among buses to obtain the most accurate measurements.
 
 We have aggregated this data to calculate average and total ridership for both routes and stops in order to understand the overall and spatial characteristics of ridership patterns in El Paso.
 
 ```{r data cleaning and organizing, warning=FALSE, message=FALSE, results=FALSE}
-ridership$Date <- ridership$Date %>% 
-  as.character() %>% 
-  substring(2) %>% 
-  as.Date(format = "%Y%m%d")
-
 df <- riderstops %>%
   na.omit(riderstops[, c("stop_lat", "stop_lon")]) %>% 
   st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4269)
@@ -528,8 +614,9 @@ local <- classified[classified$type %in% "Local", ]
 circulator <- classified[classified$type %in% "Circulator", ]
 feeder <- classified[classified$type %in% "Feeder", ]
 express <- classified[classified$type %in% "Express", ]
+brio <- classified[classified$type %in% "BRIO", ]
 
-grid.arrange(ncol=2,
+grid.arrange(ncol=3,
 localMap <- ggplot()+
   geom_sf(data=el_paso, fill='lightgrey', color="black", size=20)+
   geom_sf(data=local, color=c(palette6[2]), size=2)+
@@ -549,6 +636,11 @@ expressMap <- ggplot()+
   geom_sf(data=el_paso, fill='lightgrey', color="black", size=20)+
   geom_sf(data=express, color=c(palette6[5]), size=2)+
   labs(title="Express")+
+  mapTheme,
+brioMap <- ggplot()+
+  geom_sf(data=el_paso, fill='lightgrey', color="black", size=20)+
+  geom_sf(data=brio, color=c(palette6[6]), size=2)+
+  labs(title="BRIO")+
   mapTheme
 )
 ```
@@ -557,20 +649,29 @@ expressMap <- ggplot()+
 We utilized road centerline data and bus route data obtained from El Paso's Open Data portal to understand the overall transit system's network. The current network is visually represented below, where roads were depicted in black and the bus network was overlain in orange. We can see that the network coverage extended significantly towards areas surrounding downtown El Paso. However, several neighborhoods located in the eastern part of the city remain unserved by the current transit system. This highlights a potential gap in the transit service coverage of the city and underscores the need for equity considerations in ensuring any El Paso resident has access to transit.
 
 ```{r current network, warning=FALSE, message=FALSE, results=FALSE}
+road_centerlines <- road_centerlines %>%
+  st_transform(st_crs(el_paso))
+
 ep_roads <- st_intersection(road_centerlines, el_paso)
 
 ggplot()+
   geom_sf(data=el_paso,
           fill="lightgrey",
           color=NA)+
+  geom_sf(data=ep_roads,
+          alpha=0.9, 
+          color="black", 
+          size=1)+
   geom_sf(data=bus_routes,
           alpha=0.9, 
           color="#C96A52FF", 
           size=1)+
-  labs(title="SunMetro Bus Network",
-       caption="Data: Open Data El Paso")+
-  mapTheme
+  #labs(title="SunMetro Bus Network",
+       #caption="Data: Open Data El Paso")+
+  mapTheme2
 ```
+
+
 
 ## Analyzing route ridership
 
@@ -582,6 +683,8 @@ RT_avg_sum_st <- st_drop_geometry(RT_avg_sum)
 merged <- merge(transit_lines, RT_avg_sum_st, by.x = "route_short_name", by.y = "RT")
 
 RT_avg_sum_st <- RT_avg_sum_st[order(-RT_avg_sum_st$total_ridership),]
+
+local_RT_avg <- RT_avg_sum_st[RT_avg_sum_st$type %in% "Local", ]
 
 ggplot(RT_avg_sum_st, aes(y = total_ridership, x = reorder(factor(RT), -total_ridership), fill = type)) +
   geom_bar(stat = "identity") +
@@ -612,6 +715,36 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   geom_abline(intercept=0, slope=1, color="#C96A52FF", alpha=0.3, size=1, style='dashed')+
   plotTheme
 ```
+
+## Buffer
+
+```{r}
+# Load necessary packages
+library(sf)
+
+# Project the data to a suitable projection for distance calculations
+el_paso <- el_paso %>%
+  st_transform(st_crs=4269)
+
+stops_sf <- st_set_crs(stops_sf, 4326)
+
+stops_sf <- stops_sf %>%
+  st_transform(crs = 4269)
+
+stops_sf <- stops_sf %>%
+  mutate(buffer = st_buffer(., dist = 0.5))
+
+# Compute the union of all buffers
+buffers_union_sf <- st_union(stops_sf$buffer.geometry)
+
+# Compute the intersection of the buffer union and El Paso
+within_buffers_sf <- st_intersection(buffers_union_sf, el_paso_sf)
+
+# Compute the difference between the buffer union and El Paso
+outside_buffers_sf <- st_difference(buffers_union_sf, el_paso_sf)
+```
+
+
 
 ## Ridership by Census Tract
 
@@ -721,8 +854,6 @@ censusvarsEP <- c(
   "B25002_002E", # Occupancy status - Occupied housing units
   "B25024_001E", # Gross rent as a percentage of household income in the past 12 months
   "B25044_001E", # Vehicles available
-  "B28005_001E", # Means of transportation to work by age
-  "B28010_001E", # Commuting time to work (in minutes)
   "B10052_002E", # Disability
   "B06009_002E", # Less than high school
   "B06009_003E", # High School
@@ -737,7 +868,8 @@ acs_ep <- get_acs(geography = "tract",
                   geometry = T,
                   state = "TX", 
                   county = "El Paso", 
-                  output = "wide") 
+                  output = "wide",
+                  return_moe = FALSE) 
 
 #vec to not divide by sqkm
 dontdiv <- c("GEOID","NAME","medHHInc","grossRentPerInc","commuteToWork","geometry","area_sqmile")
@@ -757,8 +889,6 @@ acs_ep <- acs_ep %>%
     totalHU = B25001_001E, 
     occupiedHU = B25002_002E, 
     grossRentPerInc = B25024_001E, 
-    transByAge = B28005_001E,
-    commuteToWork = B28010_001E,
     lessThanHS = B06009_002E,
     highSchool = B06009_003E,
     associatesDeg = B06009_004E,
@@ -1753,6 +1883,8 @@ ggplot()+
   mapTheme
 ```
 
+
+
 ## Aggregated Ridership
 
 ```{r agg ridership, warning=FALSE, message=FALSE, results=FALSE}
@@ -1814,6 +1946,11 @@ p1c <- ridership_net_BRT %>%
 
 plot_grid(p1b,p1a,p1c, ncol=3)
   
+```
+
+```{r}
+localCentroid <- ridership_net_local %>%
+  mutate(centroid = st_centroid(geometry))
 ```
 
 

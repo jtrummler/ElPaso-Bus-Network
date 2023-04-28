@@ -14,9 +14,9 @@ output:
 
 ```{r setup, warning=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
-  warning=FALSE,
-  message=FALSE,
-  results='hide')
+                      warning=FALSE,
+                      message=FALSE,
+                      results='hide')
 
 library(sf)
 library(tidyverse)
@@ -56,6 +56,17 @@ library(ggplot2)
 library(osmdata)
 #install.packages("mapview")
 library(mapview)
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(lehdr)
+library(here)
+library(cowplot)
+library(paletteer)
+library(scales)
+library(ggpubr)
+library(caret)
+library(geojsonio)
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
@@ -66,31 +77,31 @@ data_folder <- file.path(
     dirname(), 'data')
 
 mapTheme <- theme(
-    text = element_text( color = "black"),
-    plot.title = element_text(size = 14,colour = "black"),
-    plot.subtitle=element_text(face="italic"),
-    plot.caption=element_text(hjust=0),
-    axis.ticks = element_blank(),
-    panel.background = element_blank(),axis.title = element_blank(),
-    axis.text = element_blank(),
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank(),
-    panel.grid.minor = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=2)
-  ) 
+  text = element_text( color = "black"),
+  plot.title = element_text(size = 14,colour = "black"),
+  plot.subtitle=element_text(face="italic"),
+  plot.caption=element_text(hjust=0),
+  axis.ticks = element_blank(),
+  panel.background = element_blank(),axis.title = element_blank(),
+  axis.text = element_blank(),
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "black", fill=NA, size=2)
+) 
 
 plotTheme <- theme(
-    text = element_text( color = "black"),
-    plot.title = element_text(size = 14,colour = "black"),
-    plot.subtitle=element_text(face="italic"),
-    plot.caption=element_text(hjust=0),
-    #axis.ticks = element_blank(),
-    panel.background = element_blank(),
-    #axis.title = element_blank(),
-    #axis.text = element_blank(),
-    panel.grid.minor = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=2)
-  ) 
+  text = element_text( color = "black"),
+  plot.title = element_text(size = 14,colour = "black"),
+  plot.subtitle=element_text(face="italic"),
+  plot.caption=element_text(hjust=0),
+  #axis.ticks = element_blank(),
+  panel.background = element_blank(),
+  #axis.title = element_blank(),
+  #axis.text = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "black", fill=NA, size=2)
+) 
 
 palette7 <- c("#B8860B", "#2F4F4F", "#8B0000", "#FFD700", "#556B2F", "#ADD8E6", "#FF69B4")
 
@@ -127,6 +138,7 @@ We utilized road centerline data and bus route data obtained from El Paso's Open
 
 ```{r current bus network, warning=FALSE, message=FALSE, results=FALSE}
 bus_routes <- read_sf(paste(data_folder, "/BusRoutes.geojson", sep = ''))
+road_centerlines <- read_sf(paste(data_folder, '/EPCenterline.shp', sep = ''))
 
 ggplot()+
   geom_sf(data=road_centerlines, 
@@ -145,8 +157,6 @@ ggplot()+
 ## Ridership Data (2022)
 
 Our client provided us with ridership data for the year 2022. Data was collected via sensors on a daily basis, recording number of on-boards and off-boards per stop and route. About 85% of buses were supplied with the sensors, thus the sensors had to be rotated to get the most accurate measures. 
-
-We were also provided Replica data to analyze origin and destination data, aggregated at the census tract level. We gathered data from the American Community Survey and Open Data El Paso to integrate as community demographic and built environment indicators.
 
 ```{r cleaning ridership data, warning=FALSE, message=FALSE, results=FALSE}
 ridership <- read.csv(paste(data_folder, "/ridership.csv", sep = ''))
@@ -238,6 +248,8 @@ df <- df %>%
     )
   )
 
+local <- df[df$type %in% "Local", ]
+
 road_centerlines <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = ''))
 ```
 
@@ -313,6 +325,9 @@ RT_stop_avg <- df %>%
 #       RT == 500 ~ "Streetcar"
 #     )
 #   )
+
+JS_gjson <- geojson_json(RT_stop_avg)
+writeLines(JS_gjson, "JS.geojson")
 ```
 
 We can see from the bar chart that BRIO routes are predominantly the most popular type of transit. Because of the fixed nature of BRIO routes, and political implications of bus transit design, we will primarily focus on local routes as part of our analysis. While some local routes experience relatively high ridership, we see total ridership peter out, with opportunity to increase ridership to underperforming routes.
@@ -321,9 +336,9 @@ We can see from the bar chart that BRIO routes are predominantly the most popula
 RT_avg_sum <- df %>%
   group_by(RT) %>%
   summarize(avg_ons = mean(Ons), 
-             avg_offs = mean(Offs),
-             total_ons = sum(Ons),
-             total_offs = sum(Offs)) %>%
+            avg_offs = mean(Offs),
+            total_ons = sum(Ons),
+            total_offs = sum(Offs)) %>%
   mutate(total_ridership = total_ons + total_offs) %>%
   mutate(
     type = case_when(
@@ -529,11 +544,9 @@ LL2
 
 ## Census Data (American Community Survey 2020)
 
-Next, we analyzed census data at the tract level from the 2020 American Community Survey. We particularly focused on demographic and socioeconomic indicators that we predicted to be correlated to transit ridership demand.
+First, we analyzed census data at the tract level from the 2020 American Community Survey. We particularly focused on demographic and socioeconomic indicators that we predicted to be correlated to transit ridership demand. Census variables were aggregated to the count per square mile, as this was the most intuitive measure for our hexbin.
 
 ```{r census vars, warning=FALSE, message=FALSE, results=FALSE}
-acs2020vars <- load_variables(2020, "acs5", cache = TRUE)
-
 censusvarsEP <- c(
   "B01001_001E", # ACS total Pop estimate
   "B01001I_001E", # Population - Hispanic or Latino 
@@ -560,340 +573,204 @@ censusvarsEP <- c(
 )
 
 elpaso <- get_acs(geography = "tract",
-                             year = 2020, 
-                             variables = censusvarsEP, 
-                             geometry = T,
-                             state = "TX", 
-                             county = "El Paso", 
-                             output = "wide") 
+                  year = 2020, 
+                  variables = censusvarsEP, 
+                  geometry = T,
+                  state = "TX", 
+                  county = "El Paso", 
+                  output = "wide") 
+
+#vec to not divide by sqkm
+dontdiv<- c("GEOID","NAME","medHHInc","grossRentPerInc","commuteToWork","geometry","area_sqmile")
 
 elpaso <- elpaso %>%
-rename(
-  totalPop = B01001_001E, 
-  hlPop = B01001I_001E, 
-  whitePop = B02001_002E, 
-  blackPop = B02001_003E,
-  aiPop = B02001_004E,
-  asianPop = B02001_005E,
-  nhPop = B02001_006E,
-  otherRacePop = B02001_007E,
-  twoPlusRacePop = B02001_008E,
-  medHHInc = B19013_001E,
-  totalHU = B25001_001E, 
-  occupiedHU = B25002_002E, 
-  grossRentPerInc = B25024_001E, 
-  transByAge = B28005_001E,
-  commuteToWork = B28010_001E,
-  lessThanHS = B06009_002E,
-  highSchool = B06009_003E,
-  associatesDeg = B06009_004E,
-  bachelorDeg = B06009_005E,
-  professionalDeg = B06009_006E,
-  disability = B10052_002E)
-  
-mutate(
-  area_sqmile = st_area(geometry)/2590000,
-  vacancyPct = total_vacant.2020/area_sqmile,
-      pctWhite.2020 = total_White.2020/area_sqmile,
-      pctHL.2020 = total_HL.2020/area_sqmile,
-      pctNV.2020 = noV.2020/total_HU.2020*100,
-      pctUnder18.2020 = under18.2020/total_pop.2020,
-      pctDisAb.2020 = disAb.2020/total_pop.2020,
-      pop_dense = as.numeric(total_pop.2020 / area_sqmile)
-  ) %>%
-  st_as_sf(crs = 4269) 
+  rename(
+    totalPop = B01001_001E, 
+    hlPop = B01001I_001E, 
+    whitePop = B02001_002E, 
+    blackPop = B02001_003E,
+    aiPop = B02001_004E,
+    asianPop = B02001_005E,
+    nhPop = B02001_006E,
+    otherRacePop = B02001_007E,
+    twoPlusRacePop = B02001_008E,
+    medHHInc = B19013_001E,
+    totalHU = B25001_001E, 
+    occupiedHU = B25002_002E, 
+    grossRentPerInc = B25024_001E, 
+    transByAge = B28005_001E,
+    commuteToWork = B28010_001E,
+    lessThanHS = B06009_002E,
+    highSchool = B06009_003E,
+    associatesDeg = B06009_004E,
+    bachelorDeg = B06009_005E,
+    professionalDeg = B06009_006E,
+    disability = B10052_002E) %>%
+  mutate(area_sqmile = st_area(geometry)/2590000
+  ) %>%  st_as_sf(crs = 4269) %>%
+  mutate_at(vars(-dontdiv), funs(as.numeric(./area_sqmile)))
 
+elpaso <- elpaso %>%
+  dplyr::select(-c("B01001_001M", "B01001I_001M", "B02001_002M", "B02001_003M", "B02001_004M", "B02001_005M", "B02001_006M", "B02001_007M", "B02001_008M", "B19013_001M", "B25001_001M", "B25002_002M", "B25024_001M", "B25044_001M", "B28005_001M", "B28010_001M","B10052_002M", "B06009_002M", "B06009_003M", "B06009_004M", "B06009_005M", "B06009_006M"))
 ```
 
+```{r census plot 1, warning=FALSE, message=FALSE, results=FALSE}
+censusvarsEP <- c(
+  "B01001_001E", # ACS total Pop estimate
+  "B01001I_001E", # Population - Hispanic or Latino 
+  "B02001_002E", # Population - White alone
+  "B02001_003E", # Population - Black or African American alone
+  "B02001_004E", # Population - American Indian and Alaska Native alone
+  "B02001_005E", # Population - Asian alone
+  "B02001_006E", # Population - Native Hawaiian and Other Pacific Islander alone
+  "B02001_007E", # Population - Some other race alone
+  "B02001_008E", # Population - Two or more races
+  "B19013_001E", # Median household income in the past 12 months (in 2019 inflation-adjusted dollars)
+  "B25001_001E", # Total housing units
+  "B25002_002E", # Occupancy status - Occupied housing units
+  "B25024_001E", # Gross rent as a percentage of household income in the past 12 months
+  "B25044_001E", # Vehicles available
+  "B28005_001E", # Means of transportation to work by age
+  "B28010_001E", # Commuting time to work (in minutes)
+  "B10052_002E", # Disability
+  "B06009_002E", # Less than high school
+  "B06009_003E", # High School
+  "B06009_004E", # Associates or equivalent
+  "B06009_005E", # Bachelors
+  "B06009_006E" # Graduate or prof. degree
+)
 
-## Median household income
-```{r medhhinc, warning = FALSE, cache = TRUE}
+ep <- get_acs(geography = "tract",
+              year = 2020, 
+              variables = censusvarsEP, 
+              geometry = T,
+              state = "TX", 
+              county = "El Paso", 
+              output = "wide") 
 
-medHHInc <- 
-  ggplot()+
-  geom_sf(data = elpaso, aes(fill =  med_HH_Income.2020),
-          color = "transparent")+
-  geom_sf(data = elpaso %>%
-          st_union(),
-          color = "white",
-          fill = "transparent")+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1,
-                          name="$")+
-  geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.4) +
-  geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.4) +
-  scale_color_manual(name = "Stop Ridership Data", 
-                     values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
-                     labels = c("Average Ons > 5", "Average Offs > 5")) +
-  labs(
-    title = "Median household income",
-    subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
-  mapTheme
+ep <- ep %>%
+  rename(
+    totalPop = B01001_001E, 
+    hlPop = B01001I_001E, 
+    whitePop = B02001_002E, 
+    blackPop = B02001_003E,
+    aiPop = B02001_004E,
+    asianPop = B02001_005E,
+    nhPop = B02001_006E,
+    otherRacePop = B02001_007E,
+    twoPlusRacePop = B02001_008E,
+    medHHInc = B19013_001E,
+    totalHU = B25001_001E, 
+    occupiedHU = B25002_002E, 
+    grossRentPerInc = B25024_001E, 
+    transByAge = B28005_001E,
+    commuteToWork = B28010_001E,
+    lessThanHS = B06009_002E,
+    highSchool = B06009_003E,
+    associatesDeg = B06009_004E,
+    bachelorDeg = B06009_005E,
+    professionalDeg = B06009_006E,
+    disability = B10052_002E)
 
-medHHInc
+elpasopct <- ep %>%
+  mutate(
+    whitePopPct = (whitePop/totalPop)*100,
+    hlPopPct = (hlPop/totalPop)*100,
+    asianPopPct = (asianPop/totalPop)*100,
+    blackPopPct = (blackPop/totalPop)*100
+  )
+
+
+grid.arrange(ncol=2,
+             ggplot()+
+               geom_sf(data=elpasopct, aes(fill=whitePopPct), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+               labs(title="% White population",
+                    caption="Data: ACS, 2020")+
+               mapTheme,
+             ggplot()+
+               geom_sf(data=elpasopct, aes(fill=hlPopPct), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+               labs(title="% Hispanic/Latino population",
+                    caption="Data: ACS, 2020")+
+               mapTheme,
+             ggplot()+
+               geom_sf(data=elpasopct, aes(fill=blackPopPct), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+               labs(title="% Black population",
+                    caption="Data: ACS, 2020")+
+               mapTheme,
+             ggplot()+
+               geom_sf(data=elpasopct, aes(fill=asianPopPct), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+               labs(title="% Asian population",
+                    caption="Data: ACS, 2020")+
+               mapTheme
+)
 ```
 
-## % White Population
+```{r cen plot2, warning=FALSE, message=FALSE, results=FALSE}
+elpasopct <- ep %>%
+  mutate(
+    occupiedHUPct = (occupiedHU/totalHU)*100,
+    vacantHUPct = ((totalHU-occupiedHU)/totalHU)*100
+  )
 
-```{r plot_noV1, warning = FALSE, cache = TRUE}
-pctWhite <- 
-  ggplot()+
-  geom_sf(data = elpaso, aes(fill =  pctWhite.2020),
-          color = "transparent")+
-  geom_sf(data = elpaso %>%
-          st_union(),
-          color = "white",
-          fill = "transparent")+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1,
-                          name="%")+
-  geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.4) +
-  geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.4) +
-  scale_color_manual(name = "Stop Ridership Data", 
-                     values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
-                     labels = c("Average Ons > 5", "Average Offs > 5")) +
-  labs(
-    title = "Identifies race as white",
-    subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
-  mapTheme
-
-pctWhite
-```
-
-## % Vacant Households
-
-```{r}
-pctVacant <- ggplot()+
-  geom_sf(data = elpaso, aes(fill = vacancyPct.2020),
-          color = "transparent")+
-  geom_sf(data = elpaso %>%
-          st_union(),
-          color = "white",
-          fill = "transparent")+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1,
-                          name="%")+
-  geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.4) +
-  geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.4) +
-  scale_color_manual(name = "Stop Ridership Data", 
-                     values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
-                     labels = c("Average Ons > 5", "Average Offs > 5")) +
-  labs(
-    title = "Vacant Households",
-    subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
-  mapTheme
-
-pctVacant
-```
-
-## % No Vehicle Households
-
-```{r pct no vehicle}
-pctNoVehicle <- ggplot()+
-  geom_sf(data = elpaso, aes(fill = pctNV.2020),
-          color = "transparent")+
-  geom_sf(data = elpaso %>%
-          st_union(),
-          color = "white",
-          fill = "transparent")+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1,
-                          name="%")+
-  geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.4) +
-  geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.4) +
-  scale_color_manual(name = "Stop Ridership Data", 
-                     values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
-                     labels = c("Average Ons > 5", "Average Offs > 5")) +
-  labs(
-    title = "Zero-vehicle households",
-    subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
-  mapTheme
-
-pctNoVehicle
-```
-
-## % Hispanic/Latino Population
-
-```{r hispanic latino pop}
-pctHL <- ggplot()+
-  geom_sf(data = elpaso, aes(fill = pctHL.2020),
-          color = "transparent")+
-  geom_sf(data = elpaso %>%
-          st_union(),
-          color = "white",
-          fill = "transparent")+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1,
-                          name="%")+
-  geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.4) +
-  geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.4) +
-  scale_color_manual(name = "Stop Ridership Data", 
-                     values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
-                     labels = c("Average Ons > 5", "Average Offs > 5")) +
-  labs(
-    title = "Hispanic/Latino Population",
-    subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
-  mapTheme
-
-pctHL
-```
-
-## % Residents under the age of 18
-
-```{r pct under 18}
-pctUnder18 <- ggplot()+
-  geom_sf(data = elpaso, aes(fill = pctUnder18.2020),
-          color = "transparent")+
-  geom_sf(data = elpaso %>%
-          st_union(),
-          color = "white",
-          fill = "transparent")+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1,
-                          name="%")+
-  geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.4) +
-  geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.4) +
-  scale_color_manual(name = "Stop Ridership Data", 
-                     values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
-                     labels = c("Average Ons > 5", "Average Offs > 5")) +
-  labs(
-    title = "% of residents under the age of 18",
-    subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
-  mapTheme
-
-pctUnder18
-```
-
-## % Disabled population
-
-```{r pct disab}
-pctDisabled <- ggplot()+
-  geom_sf(data = elpaso, aes(fill = pctDisAb.2020),
-          color = "transparent")+
-  geom_sf(data = elpaso %>%
-          st_union(),
-          color = "white",
-          fill = "transparent")+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1,
-                          name="%")+
-  geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.4) +
-  geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.4) +
-  scale_color_manual(name = "Stop Ridership Data", 
-                     values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
-                     labels = c("Average Ons > 5", "Average Offs > 5")) +
-  labs(
-    title = "% of residents with a disability",
-    subtitle = "Data: US Census Bureau, ACS 5-year estimates (2020)")+
-  mapTheme
-
-pctDisabled
-```
-
-
-
-```{r open data el paso loading}
-road_centerlines <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = ''))
-
-bike_lanes <- read_sf(paste(data_folder, "/BikeLanesFinal.shp", sep = ''))
-bike_lanesEx <- bike_lanes[bike_lanes$Status != "PROPOSED", ]
-bike_lanesPr <- bike_lanes[bike_lanes$Status != "EXISTING", ]
-
-parks <- read_sf(paste(data_folder, "/ParkandRecreationFacilities.shp", sep = ''))
-
-#schools <- read_sf(paste(data_folder, "/Schools.shp", sep = ''))
-
-#futureLU <- read_sf(paste(data_folder, "/FutureLandUse.shp", sep = ''))
-
-TIRZ <- read_sf(paste(data_folder, "/TIRZ.shp", sep = ''))
-```
-
-## Existing Bike Lanes + Other Roadway Infrastructure
-
-```{r bike lanes}
-ggplot()+
-  geom_sf(data=road_centerlines, alpha=0.1)+
-  geom_sf(data=bike_lanesEx, aes(color="Status"), size=1, color="#8E063BFF")+
-  geom_sf(data=bike_lanesPr, aes(color="Status"), size=1, color="#E5E797FF", alpha=0.4)+
-  geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.1) +
-  geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.1) +
-  scale_color_manual(name = "Stop Ridership Data", 
-                     values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
-                     labels = c("Average Ons > 5", "Average Offs > 5")) +
-  labs(title="Bike Lanes in El Paso, Texas",
-       subtitle="Data: Open Data El Paso",
-       caption="Lines in red indicate existing bike lanes\nLines in yellow indicate proposed bike lanes")+
-  theme()+
-  mapTheme
-```
-
-## Parks and Recreation Facilities
-
-```{r parks}
-parks$Type <- "park"
 
 ggplot()+
-  geom_sf(data=road_centerlines, alpha=0.1)+
-  geom_sf(data=parks, 
-          aes(fill=Type), 
-          size=1, 
-          alpha=.7, 
-          color="#C96A52FF")+
-  geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.1) +
-  geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.1) +
-  scale_color_manual(name = "Stop Ridership Data", 
-                     values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
-                     labels = c("Average Ons > 5", "Average Offs > 5")) +
-  labs(title="Parks in El Paso, Texas",
-       subtitle="Data: Open Data El Paso")+
+  geom_sf(data=elpasopct, aes(fill=vacantHUPct), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+  labs(title="Vacant Housing Units per sq mile",
+       subtitle="El Paso, TX (2020)",
+       caption="Data: ACS")+
   mapTheme
+
 ```
-
-## Tax Increment Reinvestment Zones
-
-```{r}
-TIRZ$TIRZ = "TIRZ"
+```{r cen plot3, warning=FALSE, message=FALSE, results=FALSE}
 ggplot()+
-  geom_sf(data=road_centerlines, alpha=0.1)+
-  geom_sf(data=TIRZ, aes(fill="TIRZ"), size=1, color="#C96A52FF", alpha=.7)+
-  geom_point(data = dfRTx_5on, aes(x = longitude, y = latitude, color = "avg_ons"), alpha=0.1) +
-  geom_point(data = dfRTx_5off, aes(x = longitude, y = latitude, color = "avg_offs"), alpha=0.1) +
-  scale_color_manual(name = "Stop Ridership Data", 
-                     values = c("avg_ons" = "limegreen", "avg_offs" = "skyblue"),
-                     labels = c("Average Ons > 5", "Average Offs > 5")) +
-  labs(title="Tax Increment Reinvestment Zones",
-       subtitle="Data: Open Data El Paso")+
+  geom_sf(data=elpaso, aes(fill=medHHInc), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+  labs(title="Median Household Income",
+       subtitle="El Paso, TX (2020)",
+       caption="Data: ACS, 2020")+
   mapTheme
 ```
-
 
 
 ## National Walkability Index (2019)
 
-```{r nwi data, }
-blocks <- blocks(state = "TX", county = "El Paso") %>%
-  st_geometry(blocks)
-
+```{r nwi data, warning=FALSE, message=FALSE,}
 nwi <- read_csv(paste(data_folder, "/nwi2019.csv", sep = '')) %>%
   dplyr::filter(CBSA_Name == "El Paso, TX") %>%
   dplyr::select(c("OBJECTID",
-                 "GEOID10",
-                 "TRACTCE",
-                 "BLKGRPCE",
-                 "TotPop",
-                 "CountHU", # number of housing units
-                 "P_WrkAge", # percent working age pop. (18-64)
-                 "HH", # households
-                 "Pct_AO0", # % of HH owning 0 vehicles
-                 "Pct_AO1", # % of HH owning 1 vehicle
-                 "Pct_AO2p", # % of HH owning 2+ vehicles
-                 "R_PCTLOWWAGE", # % of low wage workers
-                 "D1C", # employment density
-                 "D2R_JOBPOP", # jobs to population balance
-                 "D2B_E8MIXA", # employment mix
-                 "D2A_EPHHM", # employment + household mix
-                 "D3B", # intersection density
-                 "D4A", # distance from population-weighted centroid to nearest transit stop
-                 "D5AR", # regional accessibility for access to jobs
-                 "D5BR", # destination accessibility via transit
-                 )) %>%
+                  "GEOID10",
+                  "TRACTCE",
+                  "BLKGRPCE",
+                  "TotPop",
+                  "CountHU", # number of housing units
+                  "P_WrkAge", # percent working age pop. (18-64)
+                  "HH", # households
+                  "Pct_AO0", # % of HH owning 0 vehicles
+                  "Pct_AO1", # % of HH owning 1 vehicle
+                  "Pct_AO2p", # % of HH owning 2+ vehicles
+                  "R_PCTLOWWAGE", # % of low wage workers
+                  "D1C", # employment density
+                  "D2R_JOBPOP", # jobs to population balance
+                  "D2B_E8MIXA", # employment mix
+                  "D2A_EPHHM", # employment + household mix
+                  "D3B", # intersection density
+                  "D4A", # distance from population-weighted centroid to nearest transit stop
+                  "D5AR", # regional accessibility for access to jobs
+                  "D5BR", # destination accessibility via transit
+  ))
 
 nwi$GEOID <- paste0(substr(nwi$GEOID10, 1, 5), "0", sprintf("%05d", nwi$TRACTCE), nwi$BLKGRPCE)
 
-nwi_bg <- left_join(nwi, bg, by = "GEOID")
+blocks <-read_sf(paste(data_folder, "/tl_2019_48_bg.shp", sep = '')) %>%
+  dplyr::filter(COUNTYFP == 141) %>%
+  dplyr::select(-c("STATEFP", "COUNTYFP", "TRACTCE", "BLKGRPCE", "NAMELSAD", "MTFCC", "FUNCSTAT", "ALAND", "AWATER", "INTPTLAT", "INTPTLON"))
+
+nwi_bg <- left_join(nwi, blocks, by = "GEOID")
 
 nwi_bg <- st_as_sf(nwi_bg)
 
@@ -917,37 +794,155 @@ nwi_bg %>%
     destinationAccessibility = D5BR
   ) %>%
   dplyr::select(-c("OBJECTID",
-                 "GEOID10",
-                 "TRACTCE",
-                 "BLKGRPCE",))
+                   "GEOID10",
+                   "TRACTCE",
+                   "BLKGRPCE",))
+grid.arrange(ncol=3,
+             ggplot()+
+               geom_sf(data=nwi_bg, aes(fill=Pct_AO0), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+               labs(title="% Access to No Vehicle",
+                    subtitle="El Paso, TX (2019)",
+                    caption="Data: United States Census Bureau, 2019")+
+               mapTheme,
+             ggplot()+
+               geom_sf(data=nwi_bg, aes(fill=Pct_AO1), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+               labs(title="% Access to 1 Vehicle",
+                    subtitle="El Paso, TX (2019)")+
+               mapTheme,
+             ggplot()+
+               geom_sf(data=nwi_bg, aes(fill=Pct_AO2p), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+               labs(title="% Access to 2+ Vehicles",
+                    subtitle="El Paso, TX (2019)")+
+               mapTheme)
+```
 
-ggplot(data = nwi_bg) +
-  geom_sf(aes(fill = Pct_AO0)) +
+```{r job pop, warning=FALSE, message=FALSE,}
+ggplot()+
+  geom_sf(data=nwi_bg, aes(fill=D2R_JOBPOP), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
+  labs(title="Jobs to Population Balance",
+       subtitle="El Paso, TX (2019)",
+       caption="Data: National Walkability Index, 2019")+
   mapTheme
-
-
 ```
 
-```{r ndi api}
-# Load the required packages
-library(tidycensus)
-library(httr)
-
-# Set the Walk Score API key
-walkscore_key <- "97c51210c4c9acfce3869b13a5af3f28"
-
-# Get the addresses for all census block groups in El Paso, TX
-bg <- get_acs(geography = "block group", 
-              variables = "B01003_001", 
-              year = 2019,
-              state = "TX", 
-              county = "El Paso", geometry=TRUE)
-
-nwi19 <- rbind(nwi, bg)
+```{r access data, warning=FALSE, message=FALSE,}
+grid.arrange(ncol=3,
+             ggplot()+
+               geom_sf(data=nwi_bg%>% filter(D4A > 0), aes(fill=D4A), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+               labs(title="Distance from centroid \nto nearest transit stop",
+                    subtitle="El Paso, TX (2019)",
+                    caption="Data: National Walkability Index, 2019")+
+               mapTheme,
+             ggplot()+
+               geom_sf(data=nwi_bg %>% filter(D5AR > 0), aes(fill=D5AR), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+               labs(title="Regional Accessibility \nMetric - Job Access",
+                    subtitle="El Paso, TX (2019)")+
+               mapTheme,
+             ggplot()+
+               geom_sf(data=nwi_bg%>% filter(D5BR > 0), aes(fill=D5BR), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1)+
+               labs(title="Transit Destination \nAccessibility",
+                    subtitle="El Paso, TX (2019)")+
+               mapTheme)
 ```
+
+## Open Street Map Amenities
 
 
 ## Jobs Data
+
+
+
+## Existing Bike Lanes + Other Roadway Infrastructure
+
+
+```{r open data el paso loading}
+road_centerlines <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = ''))
+
+bike_lanes <- read_sf(paste(data_folder, "/BikeLanesFinal.shp", sep = ''))
+bike_lanesEx <- bike_lanes[bike_lanes$Status != "PROPOSED", ]
+bike_lanesPr <- bike_lanes[bike_lanes$Status != "EXISTING", ]
+
+parks <- read_sf(paste(data_folder, "/ParkandRecreationFacilities.shp", sep = ''))
+
+#schools <- read_sf(paste(data_folder, "/Schools.shp", sep = ''))
+
+#futureLU <- read_sf(paste(data_folder, "/FutureLandUse.shp", sep = ''))
+
+TIRZ <- read_sf(paste(data_folder, "/TIRZ.shp", sep = ''))
+
+elpaso_outline <- elpaso %>% st_union() %>% sf::st_cast()
+
+# Transform the bike lanes data to match the CRS of the outline data
+bike_lanesEx <- st_transform(bike_lanesEx, crs = st_crs(elpaso_outline))
+
+# Calculate the distance between each point in the outline data to the nearest point on the bike lanes data
+distance <- st_distance(elpaso_outline, bike_lanesEx, line_to_point = TRUE)
+
+# Add the distance values as a new column to the outline data
+elpaso_outline$distance_to_bike_lane <- distance
+
+# Plot a heatmap of the distance values
+ggplot() +
+  geom_sf(data = elpaso_outline, aes(fill = distance_to_bike_lane)) +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_void()
+
+```
+
+
+```{r bike lanes}
+bikeplot <- ggplot()+
+  geom_sf(data=road_centerlines, alpha=0.1)+
+  geom_sf(data=bike_lanesEx, size=1, color="#8E063BFF")+
+  labs(title="Bike Lanes in \nEl Paso, Texas",
+       caption="Data: Open Data El Paso",
+       )+
+  theme()+
+  mapTheme
+```
+
+## Parks and Recreation Facilities
+
+```{r parks}
+parks$Type <- "park"
+
+parkplot <- ggplot()+
+  geom_sf(data=road_centerlines, alpha=0.1)+
+  geom_sf(data=parks, 
+          size=1, 
+          alpha=.7, 
+          color="#C96A52FF")+
+  labs(title="Parks in \nEl Paso, Texas",
+       )+
+  mapTheme
+```
+
+## Tax Increment Reinvestment Zones
+
+```{r}
+TIRZ$TIRZ = "TIRZ"
+tirzplot <- ggplot()+
+  geom_sf(data=road_centerlines, alpha=0.1)+
+  geom_sf(data=TIRZ, size=1, color="#C96A52FF", alpha=.7)+
+  labs(title="Tax Increment \nReinvestment Zones",
+       )+
+  mapTheme
+```
+
+## Public Improvement Districts
+
+```{r}
+grid.arrange(ncol=3, bikeplot, parkplot, tirzplot)
+```
+
+
 
 ## Open Street Map
 
@@ -963,38 +958,6 @@ el_paso_amenities <- osmdata::osmdata_sf(
 head(el_paso_amenities$osm_points)
 
 ```
-
-
-# Modeling
-
-# Bus Network and Maps
-
-
-```{r}
-# 
-# g <- ggplot()+
-#   geom_sf(data = briolines %>% select(-route_long_name), size = 1.5, aes(color = route_id))+
-# 
-#   geom_sf(data = notbrio %>% select(-route_long_name), alpha = .75, color = 'grey')+
-#   geom_sf(data = notbrio, aes(group = route_long_name), color = 'red')+
-#   mapTheme+
-#   scale_color_manual(values = c('#B0C72C','#660066','#00A8E7'))+
-#   labs(title = 'Sun Metro Local Bus Network',
-#        subtitle = '{closest_state}')+
-#   theme(legend.position = 'none')+
-#   transition_states(route_long_name)+
-#   exit_fade()
-# 
-# animate(g, duration = 15, fps = 10, bg = 'black')
-# 
-# anim_save('citybusses.gif', g, path = "C:/Users/cchue/Documents/Penn MUSA/Spring/Practicum",  duration = 15, fps = 10, bg = 'black')
-```
-
-
-
-
-
-
 
 # Modeling
 
@@ -1025,11 +988,368 @@ ridership_net <- stop_riders_agg %>%
 
 ```
 
+
+```{r get el paso census data}
+censusvarsEP <- c(
+  "B01001_001E", # ACS total Pop estimate
+  "B01001I_001E", # Population - Hispanic or Latino 
+  "B02001_002E", # Population - White alone
+  "B02001_003E", # Population - Black or African American alone
+  "B02001_004E", # Population - American Indian and Alaska Native alone
+  "B02001_005E", # Population - Asian alone
+  "B02001_006E", # Population - Native Hawaiian and Other Pacific Islander alone
+  "B02001_007E", # Population - Some other race alone
+  "B02001_008E", # Population - Two or more races
+  "B19013_001E", # Median household income in the past 12 months (in 2019 inflation-adjusted dollars)
+  "B25001_001E", # Total housing units
+  "B25002_002E", # Occupancy status - Occupied housing units
+  "B25024_001E", # Gross rent as a percentage of household income in the past 12 months
+  "B25044_001E", # Vehicles available
+  "B28005_001E", # Means of transportation to work by age
+  "B28010_001E", # Commuting time to work (in minutes)
+  "B10052_002E", # Disability
+  "B06009_002E", # Less than high school
+  "B06009_003E", # High School
+  "B06009_004E", # Associates or equivalent
+  "B06009_005E", # Bachelors
+  "B06009_006E" # Graduate or prof. degree
+)
+
+elpaso <- get_acs(geography = "tract",
+                  year = 2020, 
+                  variables = censusvarsEP, 
+                  geometry = T,
+                  state = "TX", 
+                  county = "El Paso", 
+                  output = "wide") 
+
+#vec to not divide by sqkm
+dontdiv<- c("GEOID","NAME","medHHInc","grossRentPerInc","commuteToWork","geometry","area_sqmile")
+
+elpaso <- elpaso %>%
+  rename(
+    totalPop = B01001_001E, 
+    hlPop = B01001I_001E, 
+    whitePop = B02001_002E, 
+    blackPop = B02001_003E,
+    aiPop = B02001_004E,
+    asianPop = B02001_005E,
+    nhPop = B02001_006E,
+    otherRacePop = B02001_007E,
+    twoPlusRacePop = B02001_008E,
+    medHHInc = B19013_001E,
+    totalHU = B25001_001E, 
+    occupiedHU = B25002_002E, 
+    grossRentPerInc = B25024_001E, 
+    transByAge = B28005_001E,
+    commuteToWork = B28010_001E,
+    lessThanHS = B06009_002E,
+    highSchool = B06009_003E,
+    associatesDeg = B06009_004E,
+    bachelorDeg = B06009_005E,
+    professionalDeg = B06009_006E,
+    disability = B10052_002E) %>%
+  mutate(area_sqmile = st_area(geometry)/2590000
+  ) %>%  st_as_sf(crs = 4269) %>%
+  mutate_at(vars(-dontdiv), funs(as.numeric(./area_sqmile)))
+
+
+```
+
+```{r make_hex_net}
+busroutes <-  read_sf(paste(data_folder, "/transit_lines.geojson", sep = '')) %>% st_transform(crs = 4269)
+
+roads <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = '')) %>% st_transform(crs = 4269)
+
+#ask alex about this map
+
+
+futureLU <- read_sf(paste(data_folder, "/FutureLandUse.shp", sep = '')) %>% st_transform(crs = 4269)  
+
+futureLU_crop <- futureLU %>% st_crop(y = st_bbox(busroutes))
+
+# ggplot()+
+#    geom_sf(data = futureLU, aes(fill = COMMENTS))+
+#    geom_sf(data = roads)+
+#    geom_sf(data = busroutes, color = 'red')
+
+
+
+excludeLU <- c("Fort Bliss Military","Fort Bliss Mixed Use (Airport)","Preserve","Industrial and/or Railyards","Remote","Military Reserve")
+
+
+exclude_area <-  futureLU_crop %>% filter(COMMENTS %in% excludeLU) %>% st_union()
+
+
+
+elpaso_outline <- elpaso %>% st_union() %>% st_sf() %>% st_crop(y = st_bbox(busroutes)) %>% st_difference(exclude_area)
+
+
+hex <- st_make_grid(elpaso_outline, cellsize = .01, crs = 4269,  square = F) %>% st_sf() 
+
+hex <- hex[elpaso_outline,] %>%
+  mutate(uniqueID = rownames(.))
+
+ggplot(hex)+
+  geom_sf()+
+  mapTheme
+
+```
+
+
+
+```{r target variable into net}
+data_folder <- file.path(here() %>% dirname(), 'data')
+
+riderstops_sf <- read_csv(paste(data_folder, "/riderstops1.csv", sep = '')) %>%
+  filter(!is.na(stop_lat)) %>%
+  st_as_sf(coords = c('stop_lon', 'stop_lat'), crs = 4269) 
+
+stop_riders_agg <- riderstops_sf %>% group_by(TP) %>% summarise(ridership = sum(Ons) + sum(Offs))
+
+
+ridership_net <- stop_riders_agg %>% 
+  dplyr::select(ridership) %>% 
+  aggregate(., hex, sum) %>%
+  mutate(ridership = replace_na(ridership, 0),
+         uniqueID = rownames(.))
+
+```
+
+```{r rider hex dist}
+riders <- st_drop_geometry(ridership_net)
+
+ggplot(riders %>% filter(ridership > 0), aes(x=ridership)) + 
+  geom_histogram(color=NA, fill="#C96A52FF",bins=100)+
+  labs(title="Total ridership per hexbin", 
+       subtitle = "Hexbins with 0 ridership unaccounted", y = "", x ="Total Ridership (2022)")+
+  plotTheme
+```
+
 ```{r}
-ggplot(ridership_net %>% st_crop(y= bounds) %>% filter(ridership > 0))+
+# Load required packages
+library(dplyr)
+library(kableExtra)
+
+# Create table
+riders_table <- riders %>%
+  summarise_all(list(Total = ~n(), Count_Ridership_0 = ~sum(ridership == 0))) %>%
+  kable(align = "c") %>%
+  kable_styling("bordered", full_width=F)
+
+
+# Print table
+riders_table
+
+```
+
+```{r}
+ggplot(ridership_net %>% st_crop(y= elpaso_outline) %>% filter(ridership > 0))+
   geom_sf(aes(fill = ridership), color = NA)+
-  geom_sf(data = ridership_net %>% st_crop(y= bounds) %>%  filter(ridership == 0), color = NA, fill = '#fbfae4')+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels = comma)+
+  geom_sf(data = ridership_net %>% st_crop(y= elpaso_outline) %>%  filter(ridership == 0), color = NA, fill = '#fbfae4')+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels = comma, name='Total Ridership')+
   labs(title = "Ridership Per Hexbin", subtitle = "Downtown has an exceptional amount of ridership")+
   mapTheme
 ```
+
+```{r}
+ggplot(ridership_net %>% st_crop(y= elpaso_outline) %>% filter(ridership > 0))+
+  geom_sf(aes(fill = whitePop), color = NA)+
+  geom_sf(data = census_hex %>% st_crop(y= elpaso_outline) %>%  filter(ridership == 0), color = NA, fill = '#fbfae4')+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels = comma, name='Total Ridership')+
+  labs(title = "Ridership Per Hexbin", subtitle = "Downtown has an exceptional amount of ridership")+
+  mapTheme
+```
+
+```{r create census hex}
+
+#https://lehd.ces.census.gov/data/lodes/LODES7/LODESTechDoc7.5.pdf
+
+#get lhodes work place data
+tx_work <- grab_lodes(state = "tx", year = 2019, lodes_type = "wac", job_type = "JT01", 
+                      segment = "S000", state_part = "main", agg_geo = "tract") %>% 
+  rename(total_jobs = C000,
+         age_29_or_younger = CA01,
+         age_30_to_54 = CA02,
+         age_55_or_older = CA03,
+         monthly_income_1250_or_less = CE01,
+         monthly_income_1251_to_3333 = CE02,
+         monthly_income_3334_or_more = CE03,
+         NAICS11 = CNS01,
+         NAICS21 = CNS02,
+         NAICS22 = CNS03,
+         NAICS23 = CNS04,
+         NAICS31_33 = CNS05,
+         NAICS42 = CNS06,
+         NAICS44_46 = CNS07,
+         NAICS48_49 = CNS08,
+         NAICS51 = CNS09,
+         NAICS52 = CNS10,
+         NAICS53 = CNS11,
+         NAICS54 = CNS12,
+         NAICS55 = CNS13,
+         NAICS56 = CNS14,
+         NAICS61 = CNS15,
+         NAICS62 = CNS16,
+         NAICS71 = CNS17,
+         NAICS72 = CNS18,
+         NAICS81 = CNS19,
+         NAICS92 = CNS20,
+         white_work = CR01,
+         black_work = CR02,
+         native_american_work = CR03,
+         asian_work = CR04,
+         pacific_work = CR05,
+         mixed_race_work = CR07,
+         not_hispanic_work = CT01,
+         hispanic_work = CT02,
+         male_work = CS01,
+         female_work = CS02) %>% select(-starts_with("C"))
+#merge to census tracts data
+elpaso_work <- left_join(elpaso, tx_work, by = c('GEOID' = 'w_tract')) %>% st_sf() %>%
+  mutate_at(colnames(tx_work)[4:length(colnames(tx_work))], funs(as.numeric(./area_sqmile)))
+
+#add to hex
+census_hex <- hex %>% st_centroid() %>% st_join(elpaso_work, join=st_within) %>% 
+  st_drop_geometry() %>% 
+  full_join(., hex) %>% st_sf()
+
+
+```
+
+```{r}
+#tring another way
+
+#hex_join <- st_intersection(hex, elpaso_work) %>% group_by(uniqueID) %>% 
+# summarize()
+
+#ggplot(hex_join)+
+# geom_sf()
+```
+
+
+```{r walkabiity features}
+walkscore <- read_sf(paste(data_folder, "/nwi_bg.geojson", sep = '')) %>% rename(
+  totalPop_walk = totalPop
+)
+
+walk_hex <- hex %>% st_centroid() %>% st_join(walkscore, join=st_within)
+
+```
+
+```{r make final hex}
+final_hex <- left_join(ridership_net, st_drop_geometry(census_hex), by = "uniqueID") %>% 
+  left_join(st_drop_geometry(walk_hex), by = "uniqueID") %>% replace(is.na(.), 0)
+
+```
+
+```{r feature mapping and scatterplot}
+
+
+
+inde_var <- "total_jobs"
+
+
+
+scat <- final_hex %>% st_drop_geometry() %>% 
+  ggplot(aes(y = ridership, x = get(inde_var)))+
+  geom_point(alpha = .5)+
+  scale_x_continuous(labels = comma)+
+  scale_y_continuous(labels = comma)+
+  theme_bw()+
+  labs(title = paste("Hex Ridership vs\n",inde_var), y = 'Ridership', x = inde_var)+
+  stat_cor(method = "pearson")+
+  geom_smooth(method = 'lm', se = F, color = 'red', linetype= 'dashed')
+
+map <- final_hex %>%
+  ggplot()+
+  geom_sf(aes(fill = get(inde_var)), color =NA)+
+  paletteer::scale_fill_paletteer_c("grDevices::Red-Yellow", -1, labels= comma)+
+  labs(fill = inde_var)+
+  theme(legend.position = 'right')+
+  mapTheme
+
+plot_grid(scat, map, rel_widths = c(1,1.3))
+```
+
+```{r}
+ind2 <- 'white_work' 
+ind3 <- 'NAICS54'
+ind4 <- 'monthly_income_1250_or_less' 
+ind5 <- 'age_29_or_younger'
+
+scat2 <- final_hex %>% st_drop_geometry() %>% 
+  ggplot(aes(y = ridership, x = get(ind2)))+
+  geom_point(alpha = .5)+
+  scale_x_continuous(labels = comma)+
+  scale_y_continuous(labels = comma)+
+  theme_bw()+
+  labs(title = paste("Hex Ridership vs\n",ind2), y = 'Ridership', x = ind2)+
+  stat_cor(method = "pearson")+
+  geom_smooth(method = 'lm', se = F, color = 'red', linetype= 'dashed')
+scat3 <- final_hex %>% st_drop_geometry() %>% 
+  ggplot(aes(y = ridership, x = get(ind3)))+
+  geom_point(alpha = .5)+
+  scale_x_continuous(labels = comma)+
+  scale_y_continuous(labels = comma)+
+  theme_bw()+
+  labs(title = paste("Hex Ridership vs\n",ind3), y = 'Ridership', x = ind3)+
+  stat_cor(method = "pearson")+
+  geom_smooth(method = 'lm', se = F, color = 'red', linetype= 'dashed')
+scat4 <- final_hex %>% st_drop_geometry() %>% 
+  ggplot(aes(y = ridership, x = get(ind4)))+
+  geom_point(alpha = .5)+
+  scale_x_continuous(labels = comma)+
+  scale_y_continuous(labels = comma)+
+  theme_bw()+
+  labs(title = paste("Hex Ridership vs\n",ind4), y = 'Ridership', x = ind4)+
+  stat_cor(method = "pearson")+
+  geom_smooth(method = 'lm', se = F, color = 'red', linetype= 'dashed')
+scat5 <- final_hex %>% st_drop_geometry() %>% 
+  ggplot(aes(y = ridership, x = get(ind4)))+
+  geom_point(alpha = .5)+
+  scale_x_continuous(labels = comma)+
+  scale_y_continuous(labels = comma)+
+  theme_bw()+
+  labs(title = paste("Hex Ridership vs\n",ind5), y = 'Ridership', x = ind5)+
+  stat_cor(method = "pearson")+
+  geom_smooth(method = 'lm', se = F, color = 'red', linetype= 'dashed')
+
+plot_grid(scat, scat2, scat3, scat4, scat5, rel_widths = c(1,1))
+```
+
+
+```{r modeling}
+
+lhodes_vars <-c(colnames(tx_work)[5:length(colnames(tx_work))])
+census_vars <- c(colnames(elpaso)[!colnames(elpaso) %in% c("GEOID","NAME")] )
+walkscore_vars <- c(colnames(walk_hex))
+
+input <- final_hex %>% select(ridership, lhodes_vars, census_vars, walkscore_vars) %>% st_drop_geometry()
+
+m1 <- lm(formula = ridership ~ .,
+         data = input)
+
+m1 %>% summary()
+
+```
+
+## Training and Testing
+
+```{r}
+set.seed(987)
+
+trainIndex <- createDataPartition(y=paste(input$ridership), 
+                                  p = .65,
+                                  list = FALSE,
+                                  times = 1)
+rTrain <- input[ trainIndex,]
+rTest <- input[-trainIndex,]
+```
+
+```{r}
+originalModel <- lm(ridership ~ .,
+                    data=rTrain)
+summary(originalModel)
+```
+

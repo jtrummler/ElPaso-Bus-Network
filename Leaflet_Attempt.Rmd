@@ -1,0 +1,363 @@
+---
+title: "Forecasting Bus Transit Alternative Scenarios in El Paso, Texas"
+author: "Charlie Huemmler, Yingxue Ou, Jack Rummler"
+date: "2023-05-02"
+output: 
+  rmdformats::downcute:
+    code_folding: hide
+---
+
+<style>
+  .superbigimage {
+    overflow-x:scroll;
+    white-space: nowrap;
+  }
+
+  .superbigimage img {
+    max-width: none;
+  }
+</style>
+
+# Introduction
+
+```{r setup, warning=FALSE, message=FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning=FALSE,
+                      message=FALSE,
+                      results='hide')
+
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(tigris)
+library(boxr)
+library(lubridate)
+library(here)
+library(readxl)
+library(gridExtra)
+library(scales)
+library(viridis)
+library(leaflet)
+library(ggplotify)
+library(ggmap)
+library(classInt)
+library(rlang)
+library(dplyr)
+library(maps)
+library(plotly)
+library(RColorBrewer)
+library(htmlwidgets)
+library(magick)
+library(cowplot)
+library(paletteer)
+library(stplanr)
+library(paletteer)
+library(scales)
+library(gganimate)
+library(transformr)
+library(scales)
+library(gganimate)
+library(glue)
+library(ggtext)
+library(gapminder)
+library(ggplot2)
+library(osmdata)
+#install.packages("mapview")
+library(mapview)
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(lehdr)
+library(here)
+library(cowplot)
+library(paletteer)
+library(scales)
+library(ggpubr)
+library(caret)
+library(kableExtra)
+library(FNN)
+library(poissonreg)
+#devtools::install_github("jamgreen/lehdr")
+
+load.fun <- function(x) { 
+  x <- as.character(x) 
+  if(isTRUE(x %in% .packages(all.available=TRUE))) { 
+    eval(parse(text=paste("require(", x, ")", sep=""))) 
+    print(paste(c(x, " : already installed; requiring"), collapse=''))
+  } else { 
+    #update.packages()
+    print(paste(c(x, " : not installed; installing"), collapse=''))
+    eval(parse(text=paste("install.packages('", x, "')", sep=""))) 
+    print(paste(c(x, " : installed and requiring"), collapse=''))
+    eval(parse(text=paste("require(", x, ")", sep=""))) 
+  } 
+} 
+
+########### Required Packages ###########
+packages = c("bayesplot", "lme4","RcppEigen",
+             "tidyverse", "tidyr", "AmesHousing", "broom", "caret", "dials", "doParallel", "e1071", 
+             "earth",
+             "ggrepel", "glmnet", "ipred", "klaR", "kknn", "pROC", "rpart", "randomForest",
+             "sessioninfo", "tidymodels","ranger", "recipes", "workflows", "themis","xgboost",
+             "sf", "nngeo", "mapview")
+
+for(i in seq_along(packages)){
+  packge <- as.character(packages[i])
+  load.fun(packge)
+}
+
+session_info()
+
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+
+census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
+
+data_folder <- file.path(
+  here() %>% 
+    dirname(), 'data')
+
+mapTheme <- theme(
+  text = element_text( color = "black"),
+  plot.title = element_text(size = 14,colour = "black"),
+  plot.subtitle=element_text(face="italic"),
+  plot.caption=element_text(hjust=0),
+  axis.ticks = element_blank(),
+  panel.background = element_blank(),axis.title = element_blank(),
+  axis.text = element_blank(),
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "black", fill=NA, size=2)
+) 
+
+mapTheme2 <- theme(
+  text = element_text( color = "black"),
+  plot.title = element_text(size = 14,colour = "black"),
+  plot.subtitle=element_text(face="italic"),
+  plot.caption=element_text(hjust=0),
+  axis.ticks = element_blank(),
+  panel.background = element_blank(),axis.title = element_blank(),
+  axis.text = element_blank(),
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "white", fill=NA, size=2)
+) 
+
+plotTheme <- theme(
+  text = element_text( color = "black"),
+  plot.title = element_text(size = 14,colour = "black"),
+  plot.subtitle=element_text(face="italic"),
+  plot.caption=element_text(hjust=0),
+  #axis.ticks = element_blank(),
+  panel.background = element_blank(),
+  #axis.title = element_blank(),
+  #axis.text = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "black", fill=NA, size=2)
+) 
+
+plotTheme2 <- theme(
+  text = element_text( color = "black"),
+  plot.title = element_text(size = 14,colour = "black"),
+  plot.subtitle=element_text(face="italic"),
+  plot.caption=element_text(hjust=0),
+  #axis.ticks = element_blank(),
+  panel.background = element_blank(),
+  #axis.title = element_blank(),
+  #axis.text = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "white", fill=NA, size=2)
+) 
+palette8 <- c("#6F503E", "#F19179", "#F8AA60", "#A8A16A", "#A2B8E1", "#B898A5", "#9DA79F", "black")
+
+palette7 <- c("#6F503E", "#F19179", "#F8AA60", "#A8A16A", "#A2B8E1", "#B898A5", "#9DA79F" )
+
+palette6 <- c("#6F503E", "#F19179", "#F8AA60", "#A8A16A", "#A2B8E1", "#B898A5")
+
+palette1 <- c("#C96A52")
+
+palette5cont <- c("#7D0112", "#A7552A", "#D19D5D", "#EAD599", "#F2F1E4")
+
+sf::sf_use_s2(FALSE)
+options(scipen=999)
+```
+
+```{r files and features, include=FALSE}
+# Ridership Data from client
+riderstops <- read.csv(paste(data_folder, "/riderstops1.csv", sep = ''))
+
+# Transit Lines
+transit_lines <- st_read(paste(data_folder, "/transit_lines.geojson", sep = ''))
+bus_routes <- read_sf(paste(data_folder, "/BusRoutes.geojson", sep = ''))
+
+# Bus stops
+stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
+stops_sf <- stops %>% 
+  st_as_sf(coords = c('stop_lon','stop_lat')) 
+
+# City Boundary
+el_paso <- read_sf(paste(data_folder, "/CityLimits.geojson", sep = ''))
+
+# Tax Increment Reinvestment Zones
+tirz <- read_sf(paste(data_folder, "/TIRZ.geojson", sep = ''))
+
+# Bike Lanes + Infrastructure
+bike_lanes <- read_sf(paste(data_folder, "/BikeLanes.geojson", sep = ''))
+
+# Parks
+parks <- read_sf(paste(data_folder, "/Parks.geojson", sep = ''))
+
+# Roads
+roads <- read_sf(paste(data_folder, "/roads_filtered.geojson", sep = ''))
+road_centerlines <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = '')) %>%
+  dplyr::filter(MUNL == "EL PASO")
+
+roads_EP <- st_intersection(el_paso, road_centerlines)
+
+# FLUM
+flum <- read_sf(paste(data_folder, "/FutureLandUse.geojson", sep = ''))
+
+# Schools
+schools <- read_sf(paste(data_folder, "/Schools.geojson", sep = ''))
+
+# Rio Grande
+rio <- read_sf(paste(data_folder, "/RioGrande.geojson", sep = '')) %>%
+  st_union()
+
+st_sf(geometry = rio)
+
+# Franklin Mtns.
+franklin <- read_sf(paste(data_folder, "/FranklinMountainStatePark.geojson", sep = ''))
+
+# Fort Bliss
+ft_bliss <- read_sf(paste(data_folder, "/Texas_Military_Boundaries.geojson", sep = '')) %>%
+  dplyr::filter(MILIT_NM %in% c("Fort Bliss Military Reservation", "Fort Bliss Castner Range"))
+
+# OSM
+osm <- read_sf(paste(data_folder, "/export.geojson", sep = ''))
+
+# Local Transit Bays
+local_transit_bays <- read_sf(paste(data_folder, "/local_transit_bays.csv", sep = '')) %>%
+  st_as_sf(coords = c('lon', 'lat'), crs = 4269)
+
+####different geogs#####
+tx <- counties("TX") # STATE OF TX
+ep_co <- tx %>%
+  dplyr::filter(COUNTYFP == 141) # COUNTY OF EL PASO
+
+# BLOCK GROUPS
+ep_blocks <- block_groups("TX", year=2019) %>%
+  dplyr::filter(COUNTYFP == 141) %>%
+  st_transform(st_crs(el_paso)) %>%
+  st_intersection(el_paso, ep_blocks) %>%
+  mutate(area_sqmile = (ALAND + AWATER)/2590000) %>%
+  dplyr::select(c("GEOID", "area_sqmile", "geometry"))
+
+# TRACTS
+ep_tracts <- tracts("TX", year=2019) %>%
+  dplyr::filter(COUNTYFP == 141) %>%
+  st_transform(st_crs(el_paso)) %>%
+  st_intersection(el_paso, ep_blocks) %>%
+  mutate(area_sqmile = (ALAND + AWATER)/2590000) %>%
+  dplyr::select(c("GEOID", "area_sqmile", "geometry"))
+
+ridership <- read.csv(paste(data_folder, "/ridership.csv", sep = ''))
+
+ridership$Date <- ridership$Date %>% 
+  as.character() %>% 
+  substring(2) %>% 
+  as.Date(format = "%Y%m%d")
+
+stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
+stops_sf <- stops %>% 
+  st_as_sf(coords = c('stop_lon','stop_lat')) 
+
+riderstops <- read.csv(paste(data_folder, "/riderstops1.csv", sep = ''))
+
+df <- riderstops %>%
+  na.omit(riderstops[, c("stop_lat", "stop_lon")]) %>% 
+  st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4269)
+
+df$longitude <- st_coordinates(df$geometry)[, "X"]
+df$latitude <- st_coordinates(df$geometry)[, "Y"]
+
+df$RT <- as.numeric(df$RT)
+
+df <- df %>%
+  mutate(
+    type = case_when(
+      RT == 2 ~ "Local",
+      RT == 7 ~ "Local",
+      RT == 10 ~ "Local",
+      RT == 14 ~ "Local",
+      RT == 15 ~ "Local",
+      RT == 24 ~ "Local",
+      RT == 25 ~ "Local",
+      RT == 32 ~ "Local",
+      RT == 33 ~ "Local",
+      RT == 34 ~ "Local",
+      RT == 35 ~ "Local",
+      RT == 36 ~ "Local",
+      RT == 37 ~ "Local",
+      RT == 50 ~ "Local",
+      RT == 51 ~ "Local",
+      RT == 52 ~ "Local",
+      RT == 53 ~ "Local",
+      RT == 54 ~ "Local",
+      RT == 58 ~ "Local",
+      RT == 61 ~ "Local",
+      RT == 62 ~ "Local",
+      RT == 63 ~ "Local",
+      RT == 64 ~ "Local",
+      RT == 65 ~ "Local",
+      RT == 66 ~ "Local",
+      RT == 67 ~ "Local",
+      RT == 68 ~ "Local",
+      RT == 69 ~ "Local",
+      RT == 72 ~ "Local",
+      RT == 74 ~ "Local",
+      RT == 86 ~ "Local",
+      RT == 4 ~ "Circulator",
+      RT == 8 ~ "Circulator",
+      RT == 5 ~ "Express",
+      RT == 6 ~ "Express",
+      RT == 26 ~ "Express",
+      RT == 59 ~ "Express",
+      RT == 76 ~ "Express",
+      RT == 11 ~ "Feeder",
+      RT == 12 ~ "Feeder",
+      RT == 13 ~ "Feeder",
+      RT == 16 ~ "Feeder",
+      RT == 19 ~ "Feeder",
+      RT == 43 ~ "Feeder",
+      RT == 44 ~ "Feeder",
+      RT == 46 ~ "Feeder",
+      RT == 56 ~ "Feeder",
+      RT == 60 ~ "Feeder",
+      RT == 84 ~ "Feeder",
+      RT == 89 ~ "Feeder",
+      RT == 205 ~ "BRIO",
+      RT == 206 ~ "BRIO",
+      RT == 207 ~ "BRIO",
+      RT == 208 ~ "BRIO",
+      RT == 17 ~ "Other",
+      RT == 20 ~ "Other",
+      RT == 21 ~ "Other",
+      RT == 41 ~ "Other",
+      RT == 82 ~ "Other",
+      RT == 87 ~ "Other",
+      RT == 500 ~ "Streetcar"
+    )
+  )
+
+local <- df[df$type %in% "Local", ]
+
+road_centerlines <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = ''))
+
+```
+
+```{r}
+htmltools::HTML("my_map.html")
+```
+

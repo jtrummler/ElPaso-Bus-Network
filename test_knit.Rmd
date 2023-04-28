@@ -1,0 +1,264 @@
+---
+title: "Forecasting Bus Transit Demand in El Paso, Texas"
+author: "Charlie Huemmler, Yingxue Ou & Jack Rummler"
+date: "2023-04-03"
+output: 
+  rmdformats::material:
+    code_folding: hide
+---
+
+<style>
+  .superbigimage {
+    overflow-x:scroll;
+    white-space: nowrap;
+  }
+
+  .superbigimage img {
+    max-width: none;
+  }
+</style>
+
+# Introduction
+
+```{r setup, warning=FALSE, message=FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning=FALSE,
+                      message=FALSE,
+                      results='hide')
+
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(tigris)
+library(boxr)
+library(lubridate)
+library(here)
+library(readxl)
+library(gridExtra)
+library(scales)
+library(viridis)
+library(leaflet)
+library(ggplotify)
+library(ggmap)
+library(classInt)
+library(rlang)
+library(dplyr)
+library(maps)
+library(plotly)
+library(RColorBrewer)
+library(htmlwidgets)
+library(magick)
+library(cowplot)
+library(paletteer)
+library(stplanr)
+library(paletteer)
+library(scales)
+library(gganimate)
+library(transformr)
+library(scales)
+library(gganimate)
+library(glue)
+library(ggtext)
+library(gapminder)
+library(ggplot2)
+library(osmdata)
+#install.packages("mapview")
+library(mapview)
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(lehdr)
+library(here)
+library(cowplot)
+library(paletteer)
+library(scales)
+library(ggpubr)
+library(caret)
+library(kableExtra)
+library(FNN)
+library(poissonreg)
+#devtools::install_github("jamgreen/lehdr")
+
+load.fun <- function(x) { 
+  x <- as.character(x) 
+  if(isTRUE(x %in% .packages(all.available=TRUE))) { 
+    eval(parse(text=paste("require(", x, ")", sep=""))) 
+    print(paste(c(x, " : already installed; requiring"), collapse=''))
+  } else { 
+    #update.packages()
+    print(paste(c(x, " : not installed; installing"), collapse=''))
+    eval(parse(text=paste("install.packages('", x, "')", sep=""))) 
+    print(paste(c(x, " : installed and requiring"), collapse=''))
+    eval(parse(text=paste("require(", x, ")", sep=""))) 
+  } 
+} 
+
+########### Required Packages ###########
+packages = c("bayesplot", "lme4","RcppEigen",
+             "tidyverse", "tidyr", "AmesHousing", "broom", "caret", "dials", "doParallel", "e1071", 
+             "earth",
+             "ggrepel", "glmnet", "ipred", "klaR", "kknn", "pROC", "rpart", "randomForest",
+             "sessioninfo", "tidymodels","ranger", "recipes", "workflows", "themis","xgboost",
+             "sf", "nngeo", "mapview")
+
+for(i in seq_along(packages)){
+  packge <- as.character(packages[i])
+  load.fun(packge)
+}
+
+session_info()
+
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+
+census_api_key("746ea8916547306ae2abf2aafe059e1a1b70b98a", overwrite = TRUE)
+
+data_folder <- file.path(
+  here() %>% 
+    dirname(), 'data')
+
+mapTheme <- theme(
+  text = element_text( color = "black"),
+  plot.title = element_text(size = 14,colour = "black"),
+  plot.subtitle=element_text(face="italic"),
+  plot.caption=element_text(hjust=0),
+  axis.ticks = element_blank(),
+  panel.background = element_blank(),axis.title = element_blank(),
+  axis.text = element_blank(),
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "black", fill=NA, size=2)
+) 
+
+plotTheme <- theme(
+  text = element_text( color = "black"),
+  plot.title = element_text(size = 14,colour = "black"),
+  plot.subtitle=element_text(face="italic"),
+  plot.caption=element_text(hjust=0),
+  #axis.ticks = element_blank(),
+  panel.background = element_blank(),
+  #axis.title = element_blank(),
+  #axis.text = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "black", fill=NA, size=2)
+) 
+palette8 <- c("#6F503E", "#F19179", "#F8AA60", "#A8A16A", "#A2B8E1", "#B898A5", "#9DA79F", "black")
+
+palette7 <- c("#6F503E", "#F19179", "#F8AA60", "#A8A16A", "#A2B8E1", "#B898A5", "#9DA79F" )
+
+palette6 <- c("#6F503E", "#F19179", "#F8AA60", "#A8A16A", "#A2B8E1", "#B898A5")
+
+palette1 <- c("#C96A52")
+
+palette5cont <- c("#7D0112", "#A7552A", "#D19D5D", "#EAD599", "#F2F1E4")
+
+sf::sf_use_s2(FALSE)
+options(scipen=999)
+```
+
+```{r files and features, include=FALSE}
+# Ridership Data from client
+ridership <- read.csv(paste(data_folder, "/ridership.csv", sep = ''))
+riderstops <- read.csv(paste(data_folder, "/riderstops1.csv", sep = ''))
+
+# Transit Lines
+transit_lines <- st_read(paste(data_folder, "/transit_lines.geojson", sep = ''))
+bus_routes <- read_sf(paste(data_folder, "/BusRoutes.geojson", sep = ''))
+
+# Bus stops
+stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
+stops_sf <- stops %>% 
+  st_as_sf(coords = c('stop_lon','stop_lat')) 
+
+# City Boundary
+el_paso <- read_sf(paste(data_folder, "/CityLimits.geojson", sep = ''))
+
+# Tax Increment Reinvestment Zones
+tirz <- read_sf(paste(data_folder, "/TIRZ.geojson", sep = ''))
+
+# Bike Lanes + Infrastructure
+bike_lanes <- read_sf(paste(data_folder, "/BikeLanes.geojson", sep = ''))
+
+# Parks
+parks <- read_sf(paste(data_folder, "/Parks.geojson", sep = ''))
+
+# Roads
+roads <- read_sf(paste(data_folder, "/roads_filtered.geojson", sep = ''))
+road_centerlines <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = '')) %>%
+  dplyr::filter(MUNL == "EL PASO")
+
+# FLUM
+flum <- read_sf(paste(data_folder, "/FutureLandUse.geojson", sep = ''))
+
+# Schools
+schools <- read_sf(paste(data_folder, "/Schools.geojson", sep = ''))
+
+# Rio Grande
+rio <- read_sf(paste(data_folder, "/RioGrande.geojson", sep = ''))
+
+# Franklin Mtns.
+franklin <- read_sf(paste(data_folder, "/FranklinMountainStatePark.geojson", sep = ''))
+
+# Fort Bliss
+ft_bliss <- read_sf(paste(data_folder, "/Texas_Military_Boundaries.geojson", sep = '')) %>%
+  dplyr::filter(MILIT_NM %in% c("Fort Bliss Military Reservation", "Fort Bliss Castner Range"))
+
+# OSM
+osm <- read_sf(paste(data_folder, "/export.geojson", sep = ''))
+
+# Local Transit Bays
+local_transit_bays <- read_sf(paste(data_folder, "/local_transit_bays.csv", sep = '')) %>%
+  st_as_sf(coords = c('lon', 'lat'), crs = 4269)
+```
+
+## Acknowledgement
+
+This project was created by Charlie Huemmler, Yingxue Ou, and Jack Rummler as part of the University of Pennsylvania Master of Urban Spatial Analytics practicum. We would like to thank our client, Alex Hoffman, AICP, of the El Paso Capital Improvements Department for his continual knowledge, eagerness to help, and enthusiasm for this project. We also would like to thank Professors Matthew Harris and Michael Fichman for their invaluable mentorship throughout this process.
+
+## Introduction and Use Case
+
+> <blockquote>
+>   "El Paso, often forgotten, is building a stronger transit network than most US cities." 
+>   Christof Spieler (Trains, Buses, People) 
+> </blockquote>
+
+Transit ridership is often a key metric to assess the efficiency of public transportation systems. Like many transit agencies in the last decade, there has been annual decreases in transit ridership, with the sharpest decline in ridership at the beginning of the COVID-19 pandemic. While many transit agencies are finally beginning to see comparable transit ridership now as compared to pre-2020, transit agencies are still grappling with how to maintain existing riders and lure new riders through trustworthy and connected service.
+
+Sun Metro Mass Transit Department, referred to as Sun Metro, is the transportation provider in El Paso, Texas and is a department of the city of El Paso. Sun Metro has experienced a similar nationwide trend of declining ridership for several years prior to the pandemic and a sharp decrease in ridership and service during and post-pandemic. Moreover, Sun Metro has made several expansions to its transit service in the past decade, which include but are not limited to:
+
+**Bus Rapid Transit (BRIO):** Introduced four BRIO lines between 2014 and 2022, which experience the agency’s highest ridership and most frequent service.  
+**Streetcar Network:** Re-ignited the streetcar network in 2018 using restored PCC streetcars, providing more circuitous service in downtown, uptown, and University of Texas at El Paso.  
+**El Paso Upper East Side Transit Center:** New transit center connected to the Five Points Transit Center, the Montana BRIO line, and more park-and-ride services.  
+
+Now, Sun Metro experiences about 63% of pre-pandemic ridership numbers, but the agency is looking to explore the implications of new bus transit alternative scenarios given its service expansions and future growth trajectory. Particularly, it is looking at ways to maximize equity and accessibility in addition to fare revenue optimization.
+
+The balance between equity and revenue can often be a challenge for transit agencies to balance. While agencies want to provide access to transit for all of its residents, and particularly those who may be transit-dependent for all of their trips, this means placing bus stops in under-resourced neighborhoods that may not be profitable for the agency. Our client revealed that the El Paso Capital Improvements Department is looking to invest a certain percentage of annual funds toward under-resourced areas. Our group defined equity as both the ability for all El Paso residents to have reasonable access to a bus stop while prioritizing transit-dependent populations.
+
+Thus, we are building a two-pronged informational network for our client. This includes:
+
+**Latent bus transit demand model:** We are predicting bus transit ridership based on 2022 ridership to model demand for transit services.
+
+**Informational Network:** A scoring network to assess ridership on equity and revenue based indicators.
+
+
+## El Paso Context
+
+Sun Metro is the transportation provider in the city of El Paso, Texas. Sun Metro has made several expansions in the past decade, most notably adding four bus rapid transit (BRT) lines, adding the streetcar network, and a new transit center. With many transit agencies in the last decade, there has been a yearly decrease in bus ridership, with a sharp decrease at the start of the COVID-19 pandemic. Now, Sun Metro experiences about 63% of pre-pandemic ridership numbers, but the agency is looking to explore the implications of new bus transit services.
+
+El Paso is the sixth-largest city in Texas located at the far western tip of the state, just immediately north of Ciudad Juárez. The city is bounded by the Rio Grande River to the south, the Franklin Mountain Range to the north, and Fort Bliss Military Base to the northeast. The context map below shows the geographical constraints where the Franklin Mountains are represented in light green, Fort Bliss Military Base in dark green, and the Rio Grande River in light blue, overlain on top of population density of the city at a census tract level. As we can see, downtown El Paso is notched in between the mountains and river, with heavy sprawl toward the north and east.
+
+<div class="superbigimage">
+```{r context map, warning=FALSE, message=FALSE, results=FALSE}
+plot <- ggplot() +
+  geom_sf(data=el_paso, fill="grey") +
+  geom_sf(data=rio, fill="skyblue", color="skyblue", size=500) +
+  geom_sf(data=franklin, fill="darkgreen", color="darkgreen", alpha=0.7) +
+  geom_sf(data=ft_bliss, fill="limegreen", color="limegreen", alpha=0.7) +
+  labs(title="El Paso, Texas",
+       subtitle="Context Map",
+       caption="City limits in grey \nRio Grande River in blue \nFranklin Mountains in dark green \nFort Bliss Military Reserve in lime green")+
+  mapTheme
+
+plot
+```
+</div>
