@@ -1745,9 +1745,24 @@ ggplot(output_xgb_sf)+
 
 ```{r export hex with prediction}
 output_xgb_sf <- output_xgb_sf 
-st_write(output_xgb_sf, 'final_hex3.geojson', overwrite = T, append = F)
+#st_write(output_xgb_sf, 'final_hex3.geojson', overwrite = T, append = F)
 ```
 
 ## validating models
+
+```{r}
+# read in final dataset
+
+final_data <- read_sf("final_hex3.geojson")
+
+
+final_data <- final_data %>% mutate(
+  ridership_per_stop = ifelse(stops_in_hex != 0, ridership / stops_in_hex, 0),
+  pred_ridership_per_stop = ifelse(stops_in_hex != 0, prediction / stops_in_hex, 0))
+
+
+st_write(final_data, 'final_hex4.geojson', overwrite = T, append = F)
+```
+
 
 

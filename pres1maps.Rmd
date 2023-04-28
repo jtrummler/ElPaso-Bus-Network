@@ -44,10 +44,17 @@ source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-L
 ```
 
 ```{r}
+
 data_folder <- file.path(here() %>% dirname(), 'data')
 transitroutes <-  read_sf(paste(data_folder, "/transit_lines.geojson", sep = '')) %>% st_transform(crs = 4269)
 
-briolines <- transitroutes %>% filter(str_detect(route_long_name, 'BRIO'))
+#briolines <- transitroutes %>% filter(str_detect(route_long_name, 'BRIO'))
+
+briolines<-  read_sf(paste(data_folder, "/Brio.shp", sep = '')) %>% st_transform(crs = 4269)
+
+elpaso <- read_sf(paste(data_folder, "/CityLimits.geojson", sep = '')) %>% st_transform(crs = 4269)
+
+
 
 rivers <- read_sf(paste(data_folder, "/MajorRivers_dd83.shp", sep = '')) %>%
   st_transform(crs = 4269) %>%
@@ -83,7 +90,7 @@ juarez <- read_sf(paste(data_folder, "/ciudad-juarez-city-blocks.shp", sep = '')
 juar <- juarez  %>% st_crop(y = bounds)
 
 mxroads <-  read_sf(paste(data_folder, "/carreteras.kml", sep = '')) %>% st_transform(crs = 4269)
-#transitstops <-  read_sf(paste(data_folder, "/transit_stops.geojson", sep = ''))
+transitstops <-  read_sf(paste(data_folder, "/transit_stops.geojson", sep = ''))
 
 #brio1 <- read_sf("https://services1.arcgis.com/hyTVSIhR7dHyDsJF/arcgis/rest/services/Brio_2021/FeatureServer")
 ```
@@ -252,12 +259,12 @@ ggplot()+
 ```{r}
 
 g <- ggplot()+
-  geom_sf(data = briolines %>% select(-route_long_name), size = 1.5, aes(color = route_id))+
+  geom_sf(data = briolines, size = 1.5, aes(color = Name))+
 
   geom_sf(data = notbrio %>% select(-route_long_name), alpha = .75, color = 'grey')+
   geom_sf(data = notbrio, aes(group = route_long_name), color = 'red')+
   mapTheme+
-  scale_color_manual(values = c('#B0C72C','#660066','#00A8E7'))+
+  scale_color_manual(values = c('#B0C72C','#660066','#00A8E7', '#FF6E00'))+
   labs(title = 'Sun Metro Local Bus Network',
        subtitle = '{closest_state}')+
   theme(legend.position = 'none')+
@@ -266,7 +273,7 @@ g <- ggplot()+
 
 animate(g, duration = 15, fps = 10, bg = 'black')
 
-anim_save('citybusses.gif', g, path = "C:/Users/cchue/Documents/Penn MUSA/Spring/Practicum",  duration = 15, fps = 10, bg = 'black')
+anim_save('citybusses1.gif', g, path = "C:/Users/cchue/Documents/Penn MUSA/Spring/Practicum",  duration = 15, fps = 10, bg = 'black')
     
 ```
 ```{r}
