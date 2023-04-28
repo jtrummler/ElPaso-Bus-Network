@@ -1,19 +1,7 @@
-function initMap() {
-    const map = L.map('map').setView([31.7784703,-106.2176694], 11);
-    const mapboxAccount = 'spriteo';
-    const mapboxStyle = 'clbgshak1000014p4n9v0a2wk';
-    const mapboxToken = 'sk.eyJ1Ijoic3ByaXRlbyIsImEiOiJjbGJnc2t6NDUwaHltM3ZtdWFwNWxxN3E2In0.2w8s_It9zDX7aaQXzo6Qyg';
-    L.tileLayer(`https://api.mapbox.com/styles/v1/${mapboxAccount}/${mapboxStyle}/tiles/256/{z}/{x}/{y}@2x?access_token=${mapboxToken}`, {
-        maxZoom: 19,
-        attribution: '© <a href="https://www.mapbox.com/about/maps/">Mapbox</a> © <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> <strong><a href="https://www.mapbox.com/map-feedback/" target="_blank">Improve this map</a></strong>',
-    }).addTo(map);
-  
-    return map;
-}
+function addStopsAndRoutesLayer(stopsPath, routesPath, map) {
 
 
-function addStopsLayer(filePath, map){
-    fetch(filePath)
+    fetch(stopsPath)
     .then(response => response.json())
     .then(data => {
         // visualize geojason data in console
@@ -43,7 +31,7 @@ function addStopsLayer(filePath, map){
 
                 }
         });
-
+        console.log(ridershipData);
 
         // Create an array of unique bus routes from the GeoJSON data
         const routes = [...new Set(data.features.map(feature => feature.properties.RT))];
@@ -72,6 +60,7 @@ function addStopsLayer(filePath, map){
                 }
             });
 
+            updateLine(routesPath, map, selectedRoute);
 
             // Get the data for the barchart
             const selectedRouteData = data.features
@@ -81,19 +70,58 @@ function addStopsLayer(filePath, map){
             // Update the histogram with the selected route data
             updateBarchart(selectedRouteData, selectedRouteData[0]);
 
+            // fill in information in current-data
+            const currentData = document.getElementById('current-data'); 
+            const on_sum = selectedRouteData.reduce((accumulator, currentValue) => {
+                return accumulator + currentValue[1];
+              }, 0);
+            const off_sum = selectedRouteData.reduce((accumulator, currentValue) => {
+            return accumulator + currentValue[1];
+            }, 0);
+
+            currentData.innerHTML = '<h2>Selected Route: '+selectedRoute+'</h2>'+
+             '<p>Total Current Ridership: ' + Math.round(on_sum+off_sum) + '</p>' +
+             '<p>Total Current Ons: ' + Math.round(on_sum) + '</p>'+
+             '<p>Total Current Offs: ' + Math.round(off_sum) + '</p>';
+
          
         });
-
-
         geojsonLayer.addTo(map);
 
-        //Fit the map to the bounds of the GeoJSON layer
-        map.fitBounds(geojsonLayer.getBounds());
-    })
-    .catch(error => console.error(error));
+    });
+  }
 
-      return map;
+
+function updateLine(routesPath, map, routeValue){
+    fetch(routesPath)
+    .then(response => response.json())
+    .then(data => {
+        // visualize geojason data in console
+        console.log(data);
+
+        const filteredRoutes = data.features.filter(function(feature) {
+            console.log(feature.properties.route_short_name);
+            return feature.properties.route_short_name.toString() === routeValue;
+            });
+
+            // remove the previous routesLayer if it exists
+            if (map.routesLayer && map.hasLayer(map.routesLayer)) {
+                map.removeLayer(map.routesLayer);
+                }
+
+            map.routesLayer = L.geoJSON(filteredRoutes, {
+                style: function(feature) {
+                return {
+                    color: "#78938a",
+                    weight: 3
+                };
+                }
+            }).addTo(map);
+
+})
+
 }
+
 
 // Create a function to update the histogram
 function updateBarchart(selectedData, labels) {
@@ -102,9 +130,9 @@ function updateBarchart(selectedData, labels) {
     d3.select("#barchart").selectAll("svg").remove();
   
     // set the dimensions and margins of the graph
-    var margin = {top: 10, right: 30, bottom: 100, left: 50},
-    width = 460 - margin.left - margin.right,
-    height = 400 - margin.top - margin.bottom;
+    var margin = {top: 10, right: 30, bottom: 100, left: 80},
+    width = 1000 - margin.left - margin.right,
+    height = 200 - margin.top - margin.bottom;
 
     // append the svg object to the body of the page
     var svg = d3.select("#barchart")
@@ -173,9 +201,8 @@ function updateBarchart(selectedData, labels) {
         .attr("height", function(d) { return height - y(d.value); })
         .attr("fill", function(d) { return color(d.key); });
 }
-  
-  
-export {
-initMap,
-addStopsLayer
-};
+
+
+export{
+    addStopsAndRoutesLayer
+}

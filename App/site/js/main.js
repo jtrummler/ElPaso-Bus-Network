@@ -1,57 +1,84 @@
 
-import { initMap } from './map.js';
-
-const map = initMap();
-
-
-var transitLines
-
-// define a function to style the GeoJSON features based on their properties
-function styleFunction(feature) {
-  var value = feature.properties.route_type;
-  console.log(value)
+import { initMap} from './map.js';
+import {addStopsAndRoutesLayer } from './current_data.js';
+import { addHexLayer } from './model.js';
 
 
-  var fillColor;
-  if (value = '4') {
-    fillColor = 'green';
-  } else if (value = 2) {
-    fillColor = 'yellow';
-  } else {
-    fillColor = '#2d3439';
-  }
-  return {
-    fillColor: fillColor,
-    fillOpacity: 0.5,
-    weight: 2,
-    color: 'black',
-    
-  };
-}
+const epMap = initMap();
 
+// create a button to show the ridership data
+const ridershipButton = document.getElementById("ridership-button");
+const routesSelect = document.getElementById('routes-select');
 
-// load the GeoJSON file using the fetch API
-fetch('./data/transit_lines.geojson')
-  .then(function(response) {
-    return response.json();
-  })
-  .then(function(data) {
-    transitLines = data;
-    // create a Leaflet GeoJSON layer with the loaded data and add it to the map
-    L.geoJSON(transitLines, {style: styleFunction}).addTo(map);
+ridershipButton.addEventListener("click", function() {
+    routesSelect.style.display = 'block';
+    addStopsAndRoutesLayer('./data/ridership.geojson', './data/transit_lines.geojson', epMap)
+
+    var tabContainer = document.querySelector(".tab-container");
+    if (tabContainer.style.display === "none") {
+      tabContainer.style.display = "block";
+    }
 });
 
 
-function checkbox() {
-    // Get the checkbox
-    var checkBox = document.getElementById("myCheck");
-    // Get the output text
-    var text = document.getElementById("text");
-  
-    // If the checkbox is checked, display the output text
-    if (checkBox.checked == true){
-      text.style.display = "block";
+// Define a variable to keep track of the hex layer
+let hexLayer = null;
+
+// Get the hex button element
+const hexButton = document.getElementById("hex-button");
+
+// Add a click event listener to the hex button
+hexButton.addEventListener("click", function() {
+    if (hexLayer) {
+        // If the hex layer is already added, remove it and set the hexLayer variable to null
+        epMap.removeLayer(hexLayer);
+        hexLayer = null;
     } else {
-      text.style.display = "none";
+        // If the hex layer is not added, call the addHexLayer function and set the hexLayer variable to the returned layer
+        hexLayer = addHexLayer('./data/final_hex.geojson', epMap);
     }
-  }
+});
+
+
+
+// visit our GitHub webpage
+const githubButton = document.getElementById('github-button');
+  githubButton.addEventListener('click', () => {
+    const confirmation = confirm('You are about to visit our GitHub page. Are you sure you want to continue?');
+    if (confirmation) {
+      window.open('https://github.com/jtrummler/ElPaso-Bus-Network', '_blank');
+    }
+  });
+
+
+
+// import new routes
+const importButton = document.getElementById('import-button');
+  const fileInput = document.getElementById('file-input');
+
+  importButton.addEventListener('click', () => {
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', async () => {
+    // Get the form data from the import_routes_form
+    const form = document.getElementById('import_routes_form');
+    const formData = new FormData(form);
+
+    // Send a POST request to the server with the form data
+    const resp = await fetch('http://localhost:8080' /* <-- The URL of your cloud function */, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await resp.json();
+
+    // Do whatever you want with the data, e.g., merge the new data into the
+    // existing map hex bin layer.
+    console.log(data);
+  });
+
+
+
+
+
+
