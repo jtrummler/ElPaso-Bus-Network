@@ -68,6 +68,8 @@ route_hex <- merge %>% group_by(RT) %>%
             employmentHHMix = mean(employmentHHMix, na.rm = T))%>% 
   mutate(sum_race_pct = whitePop + blackPop + asianPop + hlPop + otherRacePop + nhPop + aiPop)
 
+write_json(route_hex,  path =  'route_hex_table')
+
 route_hex <- route_hex %>% mutate( highlight = ifelse(RT == sample(1:nrow(.),1), "y","n"))
 
 
