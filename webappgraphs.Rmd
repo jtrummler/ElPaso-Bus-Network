@@ -26,9 +26,9 @@ data_folder <- file.path(
   here() %>% 
     dirname(), 'data')
 
-final_hex <- read_sf("final_hex5.geojson")
+final_hex <- read_sf("final_hex6.geojson")
 
-final_hex <- final_data
+#final_hex <- final_data
 
 
 riderstops <- read.csv(paste(data_folder, "/riderstops1.csv", sep = '')) %>%
@@ -38,7 +38,6 @@ riderstops <- read.csv(paste(data_folder, "/riderstops1.csv", sep = '')) %>%
 
 
 
-data_all <- final_hex %>% mutate( highlight = ifelse(uniqueID == sample(1:615,1), "y","n"))
 
 
 
@@ -48,7 +47,7 @@ data_all <- final_hex %>% mutate( highlight = ifelse(uniqueID == sample(1:615,1)
 
 ```{r}
 
-merge <- st_join(riderstops, data_all, join = st_intersects) %>% st_drop_geometry()
+merge <- st_join(riderstops, final_hex, join = st_intersects) %>% st_drop_geometry()
 
 
 ## python group by aggregate 
@@ -99,4 +98,36 @@ route_hex %>% gather(-highlight, -RT, key = RT, val = val) %>% ggplot()+
 
 ```
 
+## looking at all geometry types
+
+```{r}
+grid.arrange(ncol=2,
+             ggplot()+
+               geom_sf(data=acs_ep, aes(fill=whitePopPct), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
+               labs(title="% White bt Tract",
+                    caption="Data: ACS, 2020")+
+               mapTheme,
+             ggplot()+
+               geom_sf(data=acs_race_hex, aes(fill=whitePopPct), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
+               labs(title="% White by Hex",
+                    caption="Data: ACS, 2020")+
+               mapTheme,
+             ggplot()+
+               geom_sf(data=acs_ep, aes(fill=blackPopPct), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
+               labs(title="% Black by Tract",
+                    caption="Data: ACS, 2020")+
+               mapTheme,
+             ggplot()+
+               geom_sf(data=acs_race_hex, aes(fill=blackPopPct), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
+               labs(title="% Black by Hex",
+                    caption="Data: ACS, 2020")+
+               mapTheme
+)
+
+
+```
 

@@ -570,25 +570,25 @@ Four maps of the White, Hispanic/Latino, Black, and Asian populations are below.
 ```{r race distribution maps, warning=FALSE, message=FALSE, results=FALSE, eval=FALSE}
 grid.arrange(ncol=2,
              ggplot()+
-               geom_sf(data=acs_ep1, aes(fill=whitePopPct), color=NA)+
+               geom_sf(data=acs_ep, aes(fill=whitePopPct), color=NA)+
                scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
                labs(title="% White population",
                     caption="Data: ACS, 2020")+
                mapTheme,
              ggplot()+
-               geom_sf(data=acs_ep1, aes(fill=hlPopPct), color=NA)+
+               geom_sf(data=acs_ep, aes(fill=hlPopPct), color=NA)+
                scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
                labs(title="% Hispanic/Latino population",
                     caption="Data: ACS, 2020")+
                mapTheme,
              ggplot()+
-               geom_sf(data=acs_ep1, aes(fill=blackPopPct), color=NA)+
+               geom_sf(data=acs_ep, aes(fill=blackPopPct), color=NA)+
                scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
                labs(title="% Black population",
                     caption="Data: ACS, 2020")+
                mapTheme,
              ggplot()+
-               geom_sf(data=acs_ep1, aes(fill=asianPopPct), color=NA)+
+               geom_sf(data=acs_ep, aes(fill=asianPopPct), color=NA)+
                scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
                labs(title="% Asian population",
                     caption="Data: ACS, 2020")+
@@ -1279,10 +1279,14 @@ plot_grid(p1b,p1a,p1c, ncol=3)
 # ep_work_census <- ep_work_census %>%
 #   st_transform(crs=4269)
 
+acs_extf_cols <- c("whitePopPct", "hlPopPct","asianPopPct",   "blackPopPct", "otherRacePopPct", "nhPopPct", "aiPopPct")
 
-
-acs_ep_hex <- acs_ep %>% dplyr::select(-GEOID) %>% st_interpolate_aw(hex, extensive = T) %>%
+acs_ep_hex <- acs_ep %>% dplyr::select(-GEOID, -acs_extf_cols) %>% st_interpolate_aw(hex, extensive = T) %>%
   mutate(uniqueID = rownames(.))
+
+acs_race_hex <- acs_ep %>% dplyr::select(acs_extf_cols) %>% st_interpolate_aw(hex, extensive = F) %>%
+  mutate(uniqueID = rownames(.))
+## add pct pop vars in seperataley
   
 tx_work_hex <- tx_work %>%  dplyr::select(-GEOID) %>% st_interpolate_aw(hex, extensive = F) %>%
   mutate(uniqueID = rownames(.))
@@ -1569,7 +1573,7 @@ model_rec <- recipe(ridership ~ ., data = ep_train) %>%
 XGB_plan <- boost_tree() %>%
   set_args(mtry  = tune()) %>%
   set_args(min_n = tune()) %>%
-  set_args(trees = 10) %>% 
+  set_args(trees = 300) %>% 
   set_engine("xgboost") %>% 
   set_mode("regression")
 
@@ -1577,7 +1581,7 @@ XGB_plan <- boost_tree() %>%
 # Hyperparameter grid for glmnet (penalization)
 rf_grid <- expand.grid(mtry = seq(10,100,20), 
                        min_n = c(10,30,60))
-xgb_grid <- expand.grid(mtry = seq(10,100,20), 
+xgb_grid <- expand.grid(mtry = seq(10,120,10), 
                        min_n = c(10,30,60))
 
 
@@ -1753,11 +1757,12 @@ ggplot(output_xgb_sf)+
 # read in final dataset
 
 #final_data <- read_sf("final_hex3.geojson")
-final_data <- output_xgb_sf 
+final_data <- left_join(output_xgb_sf, acs_race_hex %>% st_drop_geometry(), by = 'uniqueID')
 
 final_data <- final_data %>% mutate(
   ridership_per_stop = ifelse(stops_in_hex != 0, ridership / stops_in_hex, 0),
   pred_ridership_per_stop = ifelse(stops_in_hex != 0, prediction / stops_in_hex, 0))
+
 
 
 app_cols <- c('uniqueID', 'ridership', 'prediction', 'ridership_per_stop','pred_ridership_per_stop','whitePopPct' ,
