@@ -540,12 +540,15 @@ acs_ep <- acs_ep %>%
 #   st_as_sf(crs = 4269) %>%
 #   mutate_at(vars(-dontdiv), funs(as.numeric(./area_sqmile)))
 # 
-acs_ep1 <- acs_ep %>%
+acs_ep <- acs_ep %>%
   mutate(
     whitePopPct = (whitePop/totalPop)*100,
     hlPopPct = (hlPop/totalPop)*100,
     asianPopPct = (asianPop/totalPop)*100,
     blackPopPct = (blackPop/totalPop)*100,
+   otherRacePopPct = (otherRacePop/totalPop)*100,
+    nhPopPct = (nhPop/totalPop)*100,
+    aiPopPct = (aiPop/totalPop)*100,
     occupiedHUPct = (occupiedHU/totalHU)*100,
     vacantHUPct = ((totalHU-occupiedHU)/totalHU)*100
   ) 
@@ -1566,7 +1569,7 @@ model_rec <- recipe(ridership ~ ., data = ep_train) %>%
 XGB_plan <- boost_tree() %>%
   set_args(mtry  = tune()) %>%
   set_args(min_n = tune()) %>%
-  set_args(trees = 500) %>% 
+  set_args(trees = 10) %>% 
   set_engine("xgboost") %>% 
   set_mode("regression")
 
@@ -1743,26 +1746,35 @@ ggplot(output_xgb_sf)+
   mapTheme
 ```
 
-```{r export hex with prediction}
-output_xgb_sf <- output_xgb_sf 
-#st_write(output_xgb_sf, 'final_hex3.geojson', overwrite = T, append = F)
-```
 
-## validating models
+## export final dataset
 
 ```{r}
 # read in final dataset
 
-final_data <- read_sf("final_hex3.geojson")
-
+#final_data <- read_sf("final_hex3.geojson")
+final_data <- output_xgb_sf 
 
 final_data <- final_data %>% mutate(
   ridership_per_stop = ifelse(stops_in_hex != 0, ridership / stops_in_hex, 0),
   pred_ridership_per_stop = ifelse(stops_in_hex != 0, prediction / stops_in_hex, 0))
 
 
-st_write(final_data, 'final_hex4.geojson', overwrite = T, append = F)
+app_cols <- c('uniqueID', 'ridership', 'prediction', 'ridership_per_stop','pred_ridership_per_stop','whitePopPct' ,
+'blackPopPct','asianPopPct','hlPopPct', 'otherRacePopPct',
+'nhPopPct','aiPopPct','disability','medHHInc','employmentHHMix')
+
+
+final_data <- final_data %>% dplyr::select(app_cols)
+
+
+
+st_write(final_data, 'final_hex6.geojson', overwrite = T, append = F)
+
+
+
+
 ```
 
-
+## validating models
 

@@ -26,75 +26,77 @@ data_folder <- file.path(
   here() %>% 
     dirname(), 'data')
 
-final_hex <- read_sf(paste(data_folder, "/final_hex1.geojson", sep = ''))
+final_hex <- read_sf("final_hex5.geojson")
+
+final_hex <- final_data
 
 
-data_all <- final_hex %>% 
-  mutate(pred = ridership + rnorm(n = 1)*100,
-         highlight = ifelse(uniqueID == sample(1:615,1), "y","n"))
+riderstops <- read.csv(paste(data_folder, "/riderstops1.csv", sep = '')) %>%
+  na.omit(riderstops[, c("stop_lat", "stop_lon")]) %>% 
+  st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4269) %>%
+  dplyr::select(RT)
+
+
+
+data_all <- final_hex %>% mutate( highlight = ifelse(uniqueID == sample(1:615,1), "y","n"))
 
 
 
 ```
 
+## merge with current routes
+
+```{r}
+
+merge <- st_join(riderstops, data_all, join = st_intersects) %>% st_drop_geometry()
+
+
+## python group by aggregate 
+# joined = joined.groupby('RT').agg({'ridership_per_stop_left': 'sum', 'pred_ridership_per_stop_left': 'sum', 'whitePop_left': 'mean', 'blackPop_left': 'mean', 'asianPop_left': 'mean', 'hlPop_left': 'mean', 'otherRacePop_left': 'mean', 'nhPop_left': 'mean', 'aiPop_left': 'mean', 'disability_left': 'sum', 'medHHInc_left': 'mean', 'employmentHHMix_left': 'mean'})
+
+route_hex <- merge %>% group_by(RT) %>%
+  summarize(actual_ridership = sum(ridership_per_stop, na.rm = T),
+            predicted_ridership = sum(pred_ridership_per_stop, na.rm = T),
+            whitePop = mean(whitePopPct, na.rm = T),
+            blackPop = mean(blackPopPct, na.rm = T),
+            asianPop = mean(asianPopPct, na.rm = T),
+            hlPop = mean(hlPopPct, na.rm = T),
+            otherRacePop = mean(otherRacePopPct, na.rm = T),
+            nhPop = mean(nhPopPct, na.rm = T),
+            aiPop = mean(aiPopPct, na.rm = T),
+            disability = sum(disability, na.rm = T),
+            medHHInc = mean(medHHInc, na.rm = T),
+            employmentHHMix = mean(employmentHHMix, na.rm = T))%>% 
+  mutate(sum_race_pct = whitePop + blackPop + asianPop + hlPop + otherRacePop + nhPop + aiPop)
+
+route_hex <- route_hex %>% mutate( highlight = ifelse(RT == sample(1:nrow(.),1), "y","n"))
+
+
+
+```
+
+
+
+
 ```{r }
 
-
-p1 <- ggplot()+
-  geom_jitter(data = data_all %>% filter(highlight == 'n'), 
-              aes(y = ridership, x = ""),
+route_hex %>% gather(-highlight, -RT, key = RT, val = val) %>% ggplot()+
+  geom_jitter(data = . %>% filter(highlight == 'n'), 
+              aes(y = val, x = ""),
               color = 'grey',
               alpha = .5)+
-    geom_jitter(data = data_all %>% filter(highlight == 'y'), 
-              aes(y = ridership, x = ""),
+    geom_jitter(data = . %>% filter(highlight == 'y'), 
+              aes(y = val, x = ""),
               color = 'orange',
               width = .05)+
   scale_y_continuous(label = comma)+
   theme_minimal()+
-  theme(aspect.ratio =5)+
-  labs(y='',x='', title = "Actual Ridership")
+  theme(strip.text = element_text(size = 9))+
+  labs(y='',x='', title = "")+
+  facet_wrap(~RT, scales = 'free')
 
-p2 <- ggplot()+
-  geom_jitter(data = data_all %>% filter(highlight == 'n'), 
-              aes(y = pred, x = ""),
-              color = 'grey',
-              alpha = .5)+
-    geom_jitter(data = data_all %>% filter(highlight == 'y'), 
-              aes(y = pred, x = ""),
-              color = 'blue',
-              width = .05)+
-  theme_minimal()+
-  theme(aspect.ratio =5, axis.text.y=element_blank())+
-  labs(y='',x='', title = "Predicted Ridership")
-  
-plot_grid(p1,p2)
+
 
 ```
 
-## cars per HH
-
-```{r}
-#"pct0Car","pct1Car","pct2Car"
-
-
-car_df <- data_all %>% dplyr::select(c(uniqueID, pct0Car,pct1Car,pct2Car, highlight)) %>% st_drop_geometry()
-
-
-car_df <- car_df %>%  gather(-uniqueID,- highlight, key = numcars, value = percent)
-
-ggplot()+
-  geom_jitter(data = car_df %>% filter(highlight == 'n'), 
-              aes(y = percent, x = ""),
-              color = 'grey',
-              alpha = .5)+
-    geom_jitter(data = car_df %>% filter(highlight == 'y'), 
-              aes(y = percent, x = ""),
-              color = 'blue',
-              width = .05)+
-  theme_minimal()+
-  theme(aspect.ratio =5, axis.text.y=element_blank())+
-  labs(y='',x='', title = "Percent of households with amount of cars")+
-  facet_grid(~numcars)
-
-```
 
