@@ -35,7 +35,8 @@
         <script type="module" src="js/main.js"></script>
 
         <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.js"></script>
-
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
         </head>
 
 
@@ -70,16 +71,55 @@
 
                 <button id="hex-button" class="button-89" role="button" type="button">Predict Model</button>
 
-                <button class="button-89" id="import-button" type="button">Import routes</button>
-                <input type="file" name="network_kml" id="file-input" accept=".geojson" style="display:none">
+                <button class="button-89" id="import-button" type="button">Import Routes</button>
+                <input type="file" name="network_kml" id="file-input" accept=".kml,.geojson" style="display:none">
 
-                <button class="button-89" id="github-button" type="button">GitHub pages</button>
+                <button class="button-89" id="github-button" type="button">GitHub Pages</button>
             </form>
         </div>
 
         <div id="content">
-            <div class="inner-content">
-                <!-- Create function when click on tab, show content -->
+          <div class="eco-part">
+            <div class="dashboard_title">
+              <h1>Economics</h1>
+            </div>
+            <div class="eco-content">
+              <div class="single-jitter">
+                <h2>Current Ridership</h2>
+                <div class="jitter-content" id="current-ridership"></div>
+              </div>
+              <div class="single-jitter">
+                <h2>Predict Ridership</h2>
+                <div class="jitter-content" id="predict-ridership"></div>
+              </div>
+            </div>
+          </div>
+          <div class="eq-part">
+            <div class="dashboard_title">
+              <h1>Equity</h1>
+            </div>
+            <div class="eq-content">
+              <div class="multi-jitter">
+                <h2>Racial</h2>
+                  <div class="jitter-content" id="Races"></div>
+              </div>
+              <div class="single-jitter">
+                <h2>Disability</h2>
+                <div class="jitter-content" id="Disability"></div>
+              </div>
+              <div class="single-jitter">
+                <h2>HH Income</h2>
+                <div class="jitter-content" id="HH-Income"></div>
+              </div>
+              <div class="single-jitter">
+                <h2>Jobs/HH</h2>
+                <div class="jitter-content" id="Jobs-HH"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+          
+            <!-- <div class="inner-content">
                 <script>
                     function openTab(evt, contentName) {
                       var i, tabcontent, tablinks;
@@ -136,7 +176,7 @@
                 </div>
 
 
-            </div>
+            </div> -->
 
 
     </div>

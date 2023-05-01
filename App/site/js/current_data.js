@@ -1,11 +1,11 @@
+import {updateChart} from './dashboard.js';
+
 function addStopsAndRoutesLayer(stopsPath, routesPath, map) {
 
 
     fetch(stopsPath)
     .then(response => response.json())
     .then(data => {
-        // visualize geojason data in console
-        console.log(data);
 
         // create an empty object to store the ridership data for each bus stop
         const ridershipData = {};
@@ -31,7 +31,6 @@ function addStopsAndRoutesLayer(stopsPath, routesPath, map) {
 
                 }
         });
-        console.log(ridershipData);
 
         // Create an array of unique bus routes from the GeoJSON data
         const routes = [...new Set(data.features.map(feature => feature.properties.RT))];
@@ -43,13 +42,17 @@ function addStopsAndRoutesLayer(stopsPath, routesPath, map) {
 
         // Get the selected route from the drop-down menu
         const routesSelect = document.getElementById('routes-select');
-        // const selectedRoute = routesSelect.value;
+
+        
 
         // Add an event listener for the drop-down menu
         routesSelect.addEventListener('change', function() {
             const selectedRoute = this.value;
+            updateChart(selectedRoute);
+
 
             geojsonLayer.eachLayer(function(layer) {
+                
                 const layerRoute = layer.feature.properties.RT.toString();
                 if (selectedRoute && layerRoute !== selectedRoute) {
                     // Hide the layer if it doesn't match the selected route
@@ -57,32 +60,34 @@ function addStopsAndRoutesLayer(stopsPath, routesPath, map) {
                 } else {
                     // Show the layer if it matches the selected route
                     layer.setStyle({ opacity: 1, fillOpacity: 0.5 });
+                    // Zoom in on the selected route
+                    // map.fitBounds(layer.getBounds());
                 }
             });
 
             updateLine(routesPath, map, selectedRoute);
 
-            // Get the data for the barchart
-            const selectedRouteData = data.features
-            .filter(feature => feature.properties.RT.toString() === selectedRoute)
-            .map(feature => [feature.properties.TP, feature.properties.avg_ons, feature.properties.avg_offs]);
+            // // Get the data for the barchart
+            // const selectedRouteData = data.features
+            // .filter(feature => feature.properties.RT.toString() === selectedRoute)
+            // .map(feature => [feature.properties.TP, feature.properties.avg_ons, feature.properties.avg_offs]);
 
-            // Update the histogram with the selected route data
-            updateBarchart(selectedRouteData, selectedRouteData[0]);
+            // // Update the histogram with the selected route data
+            // updateBarchart(selectedRouteData, selectedRouteData[0]);
 
-            // fill in information in current-data
-            const currentData = document.getElementById('current-data'); 
-            const on_sum = selectedRouteData.reduce((accumulator, currentValue) => {
-                return accumulator + currentValue[1];
-              }, 0);
-            const off_sum = selectedRouteData.reduce((accumulator, currentValue) => {
-            return accumulator + currentValue[1];
-            }, 0);
+            // // fill in information in current-data
+            // const currentData = document.getElementById('current-data'); 
+            // const on_sum = selectedRouteData.reduce((accumulator, currentValue) => {
+            //     return accumulator + currentValue[1];
+            //   }, 0);
+            // const off_sum = selectedRouteData.reduce((accumulator, currentValue) => {
+            // return accumulator + currentValue[1];
+            // }, 0);
 
-            currentData.innerHTML = '<h2>Selected Route: '+selectedRoute+'</h2>'+
-             '<p>Total Current Ridership: ' + Math.round(on_sum+off_sum) + '</p>' +
-             '<p>Total Current Ons: ' + Math.round(on_sum) + '</p>'+
-             '<p>Total Current Offs: ' + Math.round(off_sum) + '</p>';
+            // currentData.innerHTML = '<h2>Selected Route: '+selectedRoute+'</h2>'+
+            //  '<p>Total Current Ridership: ' + Math.round(on_sum+off_sum) + '</p>' +
+            //  '<p>Total Current Ons: ' + Math.round(on_sum) + '</p>'+
+            //  '<p>Total Current Offs: ' + Math.round(off_sum) + '</p>';
 
          
         });
