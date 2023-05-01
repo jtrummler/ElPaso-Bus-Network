@@ -72,7 +72,7 @@
                 <button id="hex-button" class="button-89" role="button" type="button">Predict Model</button>
 
                 <button class="button-89" id="import-button" type="button">Import Routes</button>
-                <input type="file" name="network_kml" id="file-input" accept=".geojson" style="display:none">
+                <input type="file" name="network_kml" id="file-input" accept=".kml,.geojson" style="display:none">
 
                 <button class="button-89" id="github-button" type="button">GitHub Pages</button>
             </form>
@@ -86,11 +86,11 @@
             <div class="eco-content">
               <div class="single-jitter">
                 <h2>Current Ridership</h2>
-                <div id="current-ridership"></div>
+                <div class="jitter-content" id="current-ridership"></div>
               </div>
               <div class="single-jitter">
                 <h2>Predict Ridership</h2>
-                <div id="predict-ridership"></div>
+                <div class="jitter-content" id="predict-ridership"></div>
               </div>
             </div>
           </div>
@@ -101,19 +101,19 @@
             <div class="eq-content">
               <div class="multi-jitter">
                 <h2>Racial</h2>
-                  <div id="Races"></div>
+                  <div class="jitter-content" id="Races"></div>
               </div>
               <div class="single-jitter">
                 <h2>Disability</h2>
-                <div id="Disability"></div>
+                <div class="jitter-content" id="Disability"></div>
               </div>
               <div class="single-jitter">
                 <h2>HH Income</h2>
-                <div id="HH-Income"></div>
+                <div class="jitter-content" id="HH-Income"></div>
               </div>
               <div class="single-jitter">
                 <h2>Jobs/HH</h2>
-                <div id="Jobs-HH"></div>
+                <div class="jitter-content" id="Jobs-HH"></div>
               </div>
             </div>
           </div>

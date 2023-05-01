@@ -15,10 +15,10 @@ ridershipButton.addEventListener("click", function() {
     routesSelect.style.display = 'block';
     addStopsAndRoutesLayer('./data/ridership.geojson', './data/transit_lines.geojson', epMap)
 
-    var tabContainer = document.querySelector(".tab-container");
-    if (tabContainer.style.display === "none") {
-      tabContainer.style.display = "block";
-    }
+    // var tabContainer = document.querySelector(".tab-container");
+    // if (tabContainer.style.display === "none") {
+    //   tabContainer.style.display = "block";
+    // }
 });
 
 
