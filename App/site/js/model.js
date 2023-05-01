@@ -144,102 +144,129 @@ function jitterPlot(ridership, select, chartId, title) {
 
 function racialChart(feature){
 
-    const racialChartCanvas = document.getElementById('racialChartCanvas');
+  const racialChartCanvas = document.getElementById('racialChartCanvas');
 
-    racialChartCanvas.style.display = 'flex';
-    racialChartCanvas.style.height = racialChartCanvas.style.height * 1.5;
-    racialChartCanvas.style.width = racialChartCanvas.style.width * 0.5;
+  racialChartCanvas.style.display = 'flex';
+  racialChartCanvas.style.height = racialChartCanvas.style.height * 1.5;
+  racialChartCanvas.style.width = racialChartCanvas.style.width * 0.5;
 
-    // Remove the existing chart if there is one
-    if (window.racialChart) {
-        window.racialChart.destroy();
-    }
+  // Remove the existing chart if there is one
+  if (window.raceChart) {
+    window.raceChart.destroy();
+  }
 
-    const raceData = [
-      feature.properties.whitePop,
-        feature.properties.blackPop,
-        feature.properties.hlPop
-      ];
+  const whitePop = feature.properties.whitePop;
+  const blackPop = feature.properties.blackPop;
+  const asianPop = feature.properties.asianPop;
+  const otherPop = feature.properties.totalPop - whitePop - blackPop - asianPop;
 
-    const raceLabels = ['White', 'Black', 'Hispanic'];
-    
-    window.raceChart = new Chart(racialChartCanvas, {
-    type: 'pie',
+  const raceData = [whitePop, blackPop, asianPop, otherPop];
+  const raceLabels = ['White', 'Black', 'Asian', 'Others'];
+
+  window.raceChart = new Chart(racialChartCanvas, {
+    type: 'bar',
     data: {
-        labels: raceLabels,
-        datasets: [{
+      labels: raceLabels,
+      datasets: [{
+        label: 'Race',
         data: raceData,
-        backgroundColor: ['#ffb545','#78938a', '#4A5899']
-        }]
+        backgroundColor: ['#ffb545', '#78938a', '#FAD02C', '#C0C0C0']
+      }]
     },
     options: {
-        responsive: true,
-        title: {
+      responsive: true,
+      title: {
+        display: true,
+        text: 'Races Distribution',
+        fontColor: '#fff'
+      },
+      legend: {
+        display: false
+      },
+      scales: {
+        yAxes: [{
+          ticks: {
+            beginAtZero: true
+          },
+          scaleLabel: {
             display: true,
-            text: 'Races Distribution',
+            labelString: 'Population',
             fontColor: '#fff'
-        },
-        legend: {
-            labels: {
-                fontColor: '#fff',
-                fontSize: 8,
-                boxWidth: 8,
-                boxHeight: 8
-            }
-        }
+          }
+        }],
+        xAxes: [{
+          scaleLabel: {
+            display: true,
+            labelString: 'Race',
+            fontColor: '#fff'
+          }
+        }]
+      }
     }
-    });
+  });
+}
+    
 
+
+function pctCarChart(feature) {
+  const carChartCanvas = document.getElementById('carChartCanvas');
+
+  carChartCanvas.style.display = 'flex';
+  carChartCanvas.style.height = carChartCanvas.style.height * 1.5;
+  carChartCanvas.style.width = carChartCanvas.style.width * 0.5;
+  
+  // Check if the chart exists
+  if (window.carChart) {
+    // Destroy the chart if it exists
+    window.carChart.destroy();
+  }
+
+  const carData = [
+    feature.properties.pct0Car,
+    feature.properties.pct1Car,
+    feature.properties.pct2Car
+  ];
+
+  const carLabels = ['pct0Car', 'pct1Car', 'pct2Ca'];
+
+  window.carChart = new Chart(carChartCanvas, {
+    type: 'bar',
+    data: {
+      labels: carLabels,
+      datasets: [{
+        label: 'Pct Car Distribution',
+        data: carData,
+        backgroundColor: ['#ffb545', '#78938a', '#4A5899'],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      legend: {
+        labels: {
+          fontColor: '#fff',
+          fontSize: 8,
+          boxWidth: 8,
+          boxHeight: 8
+        }
+      },
+      scales: {
+        xAxes: [{
+          ticks: {
+            fontColor: "#fff"
+          }
+        }],
+        yAxes: [{
+          ticks: {
+            fontColor: "#fff",
+            beginAtZero: true
+          }
+        }]
+      }
+    }
+  });
 }
 
-
-function pctCarChart(feature){
-    const carChartCanvas = document.getElementById('carChartCanvas');
-
-    carChartCanvas.style.display = 'flex';
-    carChartCanvas.style.height = carChartCanvas.style.height * 1.5;
-    carChartCanvas.style.width = carChartCanvas.style.width * 0.5;
-    // Check if the chart exists
-    if (window.carChart) {
-        // Destroy the chart if it exists
-        window.carChart.destroy();
-    }
-
-    const carData = [
-        feature.properties.pct0Car,
-        feature.properties.pct1Car,
-        feature.properties.pct2Car
-      ];
-
-    const carLabels = ['pct0Car', 'pct1Car', 'pct2Ca'];
-
-    window.carChart = new Chart(carChartCanvas, {
-        type: 'pie',
-        data: {
-          labels: carLabels,
-          datasets: [{
-            data: carData,
-            backgroundColor: ['#ffb545','#78938a', '#4A5899']
-          }]
-        },
-        options: {
-            responsive: true,
-            title: {
-                display: true,
-                text: 'Pct Car Distribution',
-                fontColor: '#fff'
-            },
-            legend: {
-                labels: {
-                    fontColor: '#fff',
-                    fontSize: 8,
-                    boxWidth: 8,
-                    boxHeight: 8
-                }
-            }
-        }
-    });
-}
 
 
 function occupationChart(feature){

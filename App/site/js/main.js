@@ -2,9 +2,10 @@
 import { initMap} from './map.js';
 import {addStopsAndRoutesLayer } from './current_data.js';
 import { addHexLayer } from './model.js';
-
+import {ridershipData} from './dashboard.js';
 
 const epMap = initMap();
+console.log(ridershipData);
 
 // create a button to show the ridership data
 const ridershipButton = document.getElementById("ridership-button");
