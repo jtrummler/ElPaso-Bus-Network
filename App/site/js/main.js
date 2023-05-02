@@ -98,7 +98,17 @@ fileInput.addEventListener('change', async () => {
   const scenarioDiv = document.getElementById('scenario');
   const button = document.createElement('button');
   button.textContent = `Scenario ${String.fromCharCode(64 + importCounter)}`;
+  const closeButton = document.createElement('span');
+  closeButton.textContent = 'X';
+  closeButton.style.float = 'right';
+  closeButton.style.fontSize = '8px'; // Set the font size
+  button.appendChild(closeButton);
   scenarioDiv.appendChild(button);
+
+  // Add event listener to the close button
+  closeButton.addEventListener('click', () => {
+    button.remove();
+  });
 });
 
 function addNewRoutes(map, file) {
