@@ -1,5 +1,4 @@
 
-
 // Define a function to load the JSON file and return it as a promise
 async function loadJsonFile(file) {
     const response = await fetch(file);
@@ -9,6 +8,9 @@ async function loadJsonFile(file) {
   
 // Call the function to load the JSON file and store it in a variable
 const ridershipData = await loadJsonFile('./data/ridership_joined.json');
+
+console.log(ridershipData);
+
 
 const cuRidership = Object.values(ridershipData).map(d => d.ridership_per_stop_left);
 const preRidership = Object.values(ridershipData).map(d => d.pred_ridership_per_stop_left);
@@ -433,4 +435,29 @@ function new_jitterBoxes(lists, id, hightlight1, hightlight2, hightlight3, hight
   Plotly.newPlot(id, data, layout);
 }
 
-export { ridershipData, updateChart };
+function updateChartByImport(importData){
+
+  console.log(importData[0].aiPopPct);
+
+  const new_cuRidership = importData[0].ridership_per_stop;
+  const new_preRidership = importData[0].pred_ridership_per_stop;
+  const new_disability = importData[0].disability;
+  const new_Income = importData[0].medHHInc;
+  const new_aiPop = importData[0].aiPopPct;
+  const new_asianPop = importData[0].asianPopPct;
+  const new_blackPop = importData[0].blackPopPct;
+  const new_otherRacePop = importData[0].otherRacePopPct;
+  const new_empoyment = importData[0].employmentHHMix;
+
+  new_jitterBox(cuRidership, 'current-ridership', new_cuRidership);
+  new_jitterBox(preRidership, 'predict-ridership', new_preRidership);
+  new_jitterBox(disability, 'Disability', new_disability);
+  new_jitterBox(Income, "HH-Income", new_Income);
+  new_jitterBox(empoyment, 'Jobs-HH', new_empoyment);
+  new_jitterBoxes(raceLists, "Races", new_aiPop, new_blackPop, new_asianPop, new_otherRacePop);
+}
+
+export { 
+  ridershipData, 
+  updateChart, 
+  updateChartByImport};

@@ -1,5 +1,5 @@
 function initMap() {
-    const map = L.map('map').setView([31.7784703,-106.2176694], 11);
+    const map = L.map('map').setView([31.716453, -106.246004], 11);
     const mapboxAccount = 'spriteo';
     const mapboxStyle = 'clbgshak1000014p4n9v0a2wk';
     const mapboxToken = 'sk.eyJ1Ijoic3ByaXRlbyIsImEiOiJjbGJnc2t6NDUwaHltM3ZtdWFwNWxxN3E2In0.2w8s_It9zDX7aaQXzo6Qyg';
@@ -11,6 +11,128 @@ function initMap() {
     return map;
 }
 
+
+
+function addStopPoints(map, path){
+    let stopsLayer;
+    fetch(path)
+      .then(function(response) {
+        return response.json();
+      })
+      .then(function(data) {
+        stopsLayer = L.geoJSON(data, {
+          pointToLayer: function(feature, latlng) {
+            return L.circleMarker(latlng, {
+              radius: 2,
+              fillColor: "#ffb545",
+              color: "#ffb545",
+              weight: 0,
+              opacity: 1,
+              fillOpacity: 1 ,
+              zIndex: 1
+            });
+          }
+        }).addTo(map);
+
+        stopsLayer.bringToFront(); // Bring stopsLayer to the front
+      });
+  
+    const ridershipButton = document.getElementById("ridership-button");
+    ridershipButton.addEventListener("click", function() {
+      map.removeLayer(stopsLayer);
+    });
+}
+
+function addRoutes(map, path) {
+  let routesLayer;
+  
+  fetch(path)
+    .then(function(response) {
+      return response.json();
+    })
+    .then(function(data) {
+      routesLayer = L.geoJSON(data, {
+        style: {
+          color: '#78938a',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.2,
+          zIndex: 1
+        },
+        onEachFeature: function(feature, layer) {
+          layer.on('mouseover', function(event) {
+            // Define behavior for when the feature is hovered over
+            layer.setStyle({
+              color: '#ffb545',
+              weight: 4,
+              opacity: 1,
+              fillOpacity: 0.4,
+              zIndex: 2,
+              shadowColor: '#000',
+              shadowBlur: 10,
+              shadowOffset: [0, 0]
+            });
+            layer.bindTooltip(
+                              "Route Name: " + feature.properties.route_long_name + "<br>" +
+                              "Route Number: " + feature.properties.route_short_name, {
+              direction: 'top',
+              permanent: true,
+              opacity: 0.9,
+              offset: [0, -10],
+              className: 'my-tooltip-class',
+              interactive: true,
+              sticky: true
+            }).setLatLng(event.latlng).addTo(map);
+          });
+          layer.on('mouseout', function() {
+            // Define behavior for when the mouse leaves the feature
+            layer.setStyle({
+              color: '#78938a',
+              weight: 2,
+              opacity: 1,
+              fillOpacity: 0.2,
+              zIndex: 1
+            });
+            layer.unbindTooltip();
+          });
+        }
+      }).addTo(map);
+      
+      routesLayer.bringToFront();
+    });
+
+  const ridershipButton = document.getElementById('ridership-button');
+  ridershipButton.addEventListener('click', function() {
+    map.removeLayer(routesLayer);
+  });
+}
+
+  
+function addHexgrid(map, path){
+    let hexLayer;
+    fetch(path)
+        .then(function(response) {
+        return response.json();
+        })
+        .then(function(data) {
+        hexLayer = L.geoJSON(data, {
+            style: function(feature) {
+            return {
+                fillColor: '#aaa', // set the fill color to light grey
+                color: "#ececec", // set the boundary color to white
+                weight: 1,
+                fillOpacity: 0.4,
+                zIndex: -1 // set a lower zIndex for hexLayer
+            };
+            }
+        }).addTo(map);
+        });
+
+    const hexButton = document.getElementById("hex-button");
+    hexButton.addEventListener("click", function() {
+        map.removeLayer(hexLayer);
+    });
+}
 
 function addStopsLayer(filePath, map){
     fetch(filePath)
@@ -177,5 +299,8 @@ function updateBarchart(selectedData, labels) {
   
 export {
 initMap,
-addStopsLayer
+addStopsLayer,
+addHexgrid,
+addStopPoints,
+addRoutes
 };
