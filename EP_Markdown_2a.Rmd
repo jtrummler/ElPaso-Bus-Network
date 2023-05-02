@@ -1763,8 +1763,7 @@ ggplot(output_xgb_sf)+
 # read in final dataset
 
 #final_data <- read_sf("final_hex3.geojson")
-final_data <- left_join(output_xgb_sf %>%  dplyr::select(-medHHInc), acs_race_hex %>% st_drop_geometry(), by = 'uniqueID') %>% 
-   left_join(medHHInc_hex %>% st_drop_geometry(), by = 'uniqueID')
+final_data <- left_join(output_xgb_sf, acs_race_hex %>% st_drop_geometry(), by = 'uniqueID')
 
 final_data <- final_data %>% mutate(
   ridership_per_stop = ifelse(stops_in_hex != 0, ridership / stops_in_hex, 0),
@@ -1781,7 +1780,7 @@ final_data <- final_data %>% dplyr::select(app_cols)
 
 
 
-st_write(final_data, 'final_hex6.geojson', overwrite = T, append = F)
+#st_write(final_data, 'final_hex7.geojson', overwrite = T, append = F)
 
 
 
