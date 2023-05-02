@@ -1169,18 +1169,23 @@ bus_routes <- bus_routes %>%
 
 flum_crop <- flum %>%
   st_transform(crs=4269) %>%
-  st_crop(y = st_bbox(bus_routes))
+  st_crop(y = st_bbox(bus_routes)) 
+
 
 excludeLU <- c("Fort Bliss Military",
-               "Fort Bliss Mixed Use (Airport)",
-               "Preserve",
-               "Industrial and/or Railyards",
+               #"Fort Bliss Mixed Use (Airport)",
+               #"Preserve",
+               #"Industrial and/or Railyards",
                "Remote",
-               "Military Reserve")
+               "Military Reserve"
+)
 
 exclude_area <- flum_crop %>% 
   filter(COMMENTS %in% excludeLU) %>% 
   st_union()
+
+franklin <- franklin %>%
+  st_union() %>% st_as_sf() %>% st_transform(crs=4269) %>% st_buffer(dist=0.0005)
 
 el_paso <- el_paso %>%
   st_transform(crs=4269)
@@ -1189,6 +1194,7 @@ elpaso_outline <- el_paso %>%
   st_union() %>% 
   st_sf() %>% 
   st_crop(y = st_bbox(bus_routes)) %>% 
+  st_difference(franklin) %>%
   st_difference(exclude_area)
 
 hex <- st_make_grid(elpaso_outline, 
@@ -1205,6 +1211,9 @@ ggplot()+
   geom_sf(data=hex, fill=c(palette1), alpha=0.7)+
   labs(title="Hex Bin Grid - El Paso, Texas")+
   mapTheme
+
+ggplot()+
+  geom_sf(data=elpaso_outline)
 ```
 
 ## Aggregated Ridership
