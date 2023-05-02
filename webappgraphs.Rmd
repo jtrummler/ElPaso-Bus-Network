@@ -202,3 +202,6 @@ write_json(route_hex,  path =  'current_routes_db_agg')
 
 ```
 
+
+## cross validation
+
