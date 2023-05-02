@@ -11,14 +11,20 @@ async function loadJsonFile(file) {
 const ridershipData = await loadJsonFile('./data/ridership_joined.json');
 
 const cuRidership = Object.values(ridershipData).map(d => d.ridership_per_stop_left);
-  const preRidership = Object.values(ridershipData).map(d => d.pred_ridership_per_stop_left);
-  const disability = Object.values(ridershipData).map(d => d.disability_left);
-  const Income = Object.values(ridershipData).map(d => d.medHHInc_left);
-  const aiPop = Object.values(ridershipData).map(d => d.aiPop_left);
-  const asianPop = Object.values(ridershipData).map(d => d.asianPop_left);
-  const blackPop = Object.values(ridershipData).map(d => d.blackPop_left);
-  const otherRacePop = Object.values(ridershipData).map(d => d.otherRacePop_left);
-  const empoyment = Object.values(ridershipData).map(d => d.employmentHHMix_left);
+const preRidership = Object.values(ridershipData).map(d => d.pred_ridership_per_stop_left);
+const disability = Object.values(ridershipData).map(d => d.disability_left);
+const Income = Object.values(ridershipData).map(d => d.medHHInc_left);
+const aiPop = Object.values(ridershipData).map(d => d.aiPop_left);
+const asianPop = Object.values(ridershipData).map(d => d.asianPop_left);
+const blackPop = Object.values(ridershipData).map(d => d.blackPop_left);
+const otherRacePop = Object.values(ridershipData).map(d => d.otherRacePop_left);
+const empoyment = Object.values(ridershipData).map(d => d.employmentHHMix_left);
+
+var raceLists = [];
+  raceLists.push(aiPop);
+  raceLists.push(blackPop);
+  raceLists.push(asianPop);
+  raceLists.push(otherRacePop);
 
 
 // open webpage, present the charts without highlights
@@ -28,65 +34,62 @@ function originChart(){
   jitterBox(disability, 'Disability');
   jitterBox(Income, "HH-Income");
   jitterBox(empoyment, 'Jobs-HH');
-
-  var raceLists = [];
-  raceLists.push(aiPop);
-  raceLists.push(blackPop);
-  raceLists.push(asianPop);
-  raceLists.push(otherRacePop);
-  jitterBoxes(raceLists, "Races")
+  jitterBoxes(raceLists, "Races");
 
 }
 
 originChart();
 
-// Get the selected route from the drop-down menu
-const routesSelect = document.getElementById('routes-select');
-console.log(routesSelect);
+// // Get the selected route from the drop-down menu
+// const routesSelect = document.getElementById('routes-select');
+// console.log(routesSelect);
+
 
 function removeCharts() {
-  const singleCharts = document.querySelectorAll('.single-jitter');
-  const multiCharts = document.querySelectorAll('.multi-jitter');
+  // const singleCharts = document.querySelectorAll('.single-jitter');
+  // const multiCharts = document.querySelectorAll('.multi-jitter');
 
-  singleCharts.forEach(chart => chart.remove());
-  multiCharts.forEach(chart => chart.remove());
+  // singleCharts.forEach(chart => chart.remove());
+  // multiCharts.forEach(chart => chart.remove());
+  // const chart = document.querySelectorAll('.jitter-content');
+  // chart.forEach(chart => chart.remove());
 }
 
-routesSelect.addEventListener('change', () => {
+// routesSelect.addEventListener('change', () => {
+//   // Remove all charts when the drop-down menu is selected
+//   removeCharts();
+// });
+
+
+function updateChart(selected){
   // Remove all charts when the drop-down menu is selected
-  removeCharts();
-});
+  // removeCharts();
 
+  const dic = ridershipData[selected];
 
-function getRouteData(dic, selector) {
-  // Get the data for the barchart
-  for (const key in dic) {
-    if (key.toString() === selector) {
-      return ridershipData[key];
-    }
-  }
-}
-
-const selectedRouteData = getRouteData(ridershipData, routesSelect);
-console.log(selectedRouteData);
-
-
-function updateChart(dic){
-  const new_cuRidership = dic[ridership_per_stop_left];
-  const new_preRidership = dic[pred_ridership_per_stop_left];
-  const new_disability = dic[disability_left];
-  const new_Income = dic[medHHInc_left];
-  const new_aiPop = dic[aiPop_left];
-  const new_asianPop = dic[asianPop_left];
-  const new_blackPop = dic[blackPop_left];
-  const new_otherRacePop = dic[otherRacePop_left];
-  const new_empoyment = dic[employmentHHMix_left];
+  console.log(ridershipData);
+  console.log(selected);
+  console.log(dic);
+  
+  const new_cuRidership = dic['ridership_per_stop_left'];
+  const new_preRidership = dic['pred_ridership_per_stop_left'];
+  const new_disability = dic['disability_left'];
+  const new_Income = dic['medHHInc_left'];
+  const new_aiPop = dic['aiPop_left'];
+  const new_asianPop = dic['asianPop_left'];
+  const new_blackPop = dic['blackPop_left'];
+  const new_otherRacePop = dic['otherRacePop_left'];
+  const new_empoyment = dic['employmentHHMix_left'];
 
   new_jitterBox(cuRidership, 'current-ridership', new_cuRidership);
+  new_jitterBox(preRidership, 'predict-ridership', new_preRidership);
+  new_jitterBox(disability, 'Disability', new_disability);
+  new_jitterBox(Income, "HH-Income", new_Income);
+  new_jitterBox(empoyment, 'Jobs-HH', new_empoyment);
+  new_jitterBoxes(raceLists, "Races", new_aiPop, new_blackPop, new_asianPop, new_otherRacePop);
+
 
 }
-
-
 
 
 function jitterBox(list, id){
@@ -188,11 +191,14 @@ function jitterBoxes(lists, id){
         color: '#fff'
       },
       tickfont: {
-        size: 8,
+        size: 10,
         color: '#fff'
-      }
+      },
+      tickangle: 0,  // Optional: rotate the tick labels for better visibility
+      automargin: true  // Optional: automatically adjust margins to fit labels
     },
     yaxis: {
+      autorange: true,
       showgrid: false,
       zeroline: false,
       titlefont: {
@@ -205,7 +211,7 @@ function jitterBoxes(lists, id){
       }
     },
     font: {
-      size: 8,
+      size: 12,
       color: '#fff'
     },
     margin: {
@@ -218,7 +224,7 @@ function jitterBoxes(lists, id){
     autosize: true,
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor: 'rgba(0,0,0,0)',
-    height: 180,
+    height: 175,
     width: 300,
     showlegend: false
   };
@@ -295,8 +301,7 @@ function new_jitterBox(list, id, hightlight){
         y1: hightlight,
         line: {
           color: 'orange',
-          width: 2,
-          dash: 'dashdot'
+          width: 4
         }
       }
     ]
@@ -306,7 +311,7 @@ function new_jitterBox(list, id, hightlight){
 
 }
 
-function new_jitterBoxes(lists, id){
+function new_jitterBoxes(lists, id, hightlight1, hightlight2, hightlight3, hightlight4){
   var xData = ['White', 'Black', 'Asian', 'Others'];
   var yData = lists;
 
@@ -341,11 +346,14 @@ function new_jitterBoxes(lists, id){
         color: '#fff'
       },
       tickfont: {
-        size: 8,
+        size: 10,
         color: '#fff'
-      }
+      },
+      tickangle: 0,  // Optional: rotate the tick labels for better visibility
+      automargin: true  // Optional: automatically adjust margins to fit labels
     },
     yaxis: {
+      autorange: true,
       showgrid: false,
       zeroline: false,
       titlefont: {
@@ -358,7 +366,7 @@ function new_jitterBoxes(lists, id){
       }
     },
     font: {
-      size: 8,
+      size: 12,
       color: '#fff'
     },
     margin: {
@@ -371,20 +379,52 @@ function new_jitterBoxes(lists, id){
     autosize: true,
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor: 'rgba(0,0,0,0)',
-    height: 180,
+    height: 175,
     width: 300,
     showlegend: false,
     shapes: [
       {
         type: 'line',
         x0: -0.5,
-        y0: hightlight,
-        x1: 0.5,
-        y1: hightlight,
+        y0: hightlight1,
+        x1: 0.25,
+        y1: hightlight1,
         line: {
           color: 'orange',
-          width: 2,
-          dash: 'dashdot'
+          width: 4
+        }
+      },
+      {
+        type: 'line',
+        x0: 0.5,
+        y0: hightlight2,
+        x1: 1.25,
+        y1: hightlight2,
+        line: {
+          color: 'orange',
+          width: 4
+        }
+      },
+      {
+        type: 'line',
+        x0: 1.5,
+        y0: hightlight3,
+        x1: 2.25,
+        y1: hightlight3,
+        line: {
+          color: 'orange',
+          width: 4
+        }
+      },
+      {
+        type: 'line',
+        x0: 2.5,
+        y0: hightlight4,
+        x1: 3.25,
+        y1: hightlight4,
+        line: {
+          color: 'orange',
+          width: 4
         }
       }
     ]
@@ -393,4 +433,4 @@ function new_jitterBoxes(lists, id){
   Plotly.newPlot(id, data, layout);
 }
 
-export { ridershipData };
+export { ridershipData, updateChart };

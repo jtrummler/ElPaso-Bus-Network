@@ -28,6 +28,8 @@ knitr::opts_chunk$set(echo = TRUE,
                       results='hide')
 
 library(sf)
+#install.packages("ggsn")
+library(ggsn)
 library(tidyverse)
 library(tidycensus)
 library(tigris)
@@ -145,6 +147,22 @@ mapTheme2 <- theme(
   panel.border = element_rect(colour = "white", fill=NA, size=2)
 ) 
 
+mapTheme3 <- theme(
+  text = element_text( color = "black"),
+  plot.title = element_text(size = 14,colour = "black"),
+  plot.subtitle=element_text(face="italic"),
+  plot.caption=element_text(hjust=0),
+  axis.ticks = element_blank(),
+  panel.background = element_rect(fill="black"),
+  axis.title = element_blank(),
+  axis.text = element_blank(),
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.grid.major = element_blank(), # remove major grid lines
+  panel.grid.minor = element_blank(), # remove minor grid lines
+  panel.border = element_rect(colour = "white", fill=NA, size=2)
+) 
+
 plotTheme <- theme(
   text = element_text( color = "black"),
   plot.title = element_text(size = 14,colour = "black"),
@@ -241,6 +259,11 @@ osm <- read_sf(paste(data_folder, "/export.geojson", sep = ''))
 # Local Transit Bays
 local_transit_bays <- read_sf(paste(data_folder, "/local_transit_bays.csv", sep = '')) %>%
   st_as_sf(coords = c('lon', 'lat'), crs = 4269)
+
+# Hex
+final_hex4 <- read_sf(paste(data_folder, "/final_hex4.geojson", sep = ''))
+final_hex6 <- read_sf(paste(data_folder, "/final_hex6.geojson", sep = ''))
+hex6cleaned <- final_hex6[!duplicated(final_hex6$uniqueID), ]
 
 # Different Geographies 
 
@@ -570,8 +593,7 @@ ggplot()+
   geom_sf(data=tx, fill='grey', color='black', size=0.5)+
   geom_sf(data=ep_co, fill=palette6[2])+
   theme(panel.background = element_rect(fill = "white"))+
-  mapTheme2,
-top="Context Map - El Paso, TX"
+  mapTheme2
 )
 ```
 
@@ -597,6 +619,7 @@ ggplot()+
           alpha=0.9, 
           color="#C96A52FF", 
           size=1)+
+  ggsn::scalebar(el_paso, location="bottomleft", dist_unit = 'mi', dist=2, height=0.01, transform=TRUE, model='WGS84')+
   labs(title="Current Bus Network",
        subtitle="Sun Metro Mass Transit - El Paso, TX",
        caption="Current road network in black\nCurrent bus transit network in orange")+
@@ -668,6 +691,8 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
        caption="Data: El Paso Capital Improvements Department, 2022")+
   geom_smooth(method = lm, se=FALSE, colour = "#C96A52FF", size=1, )+
   geom_abline(intercept=0, slope=1, color="#C96A52FF", alpha=0.3, size=1, style='dashed')+
+  annotate("text", x = Inf, y = Inf, hjust = 5, vjust = 5,
+           label = paste0("R^2 = ", round(summary(lm(avg_ons ~ avg_offs, data = RT_stop_avg_st))$r.squared, 3)))+
   plotTheme
 ```
 
@@ -782,12 +807,70 @@ hex <- hex[elpaso_outline,] %>%
 
 ggplot()+
   geom_sf(data=el_paso, fill='grey')+
-  geom_sf(data=hex, fill=c(palette1), alpha=0.7)+
+  geom_sf(data=final_hex, fill=c(palette1), alpha=0.7)+
   labs(title="Hex Bin Grid",
   subtitle="El Paso, Texas",
   caption="Total ridership for the year 2022 will be aggregated into each hexbin as the dependent variable,\nin addition to our predictive features.")+
   mapTheme
 ```
+```{r}
+jenks <- classIntervals(final_hex$ridership, n = 5, style = "jenks")
+
+# Create categorical variable based on jenks breaks
+final_hex$quintile <- cut(final_hex$ridership, jenks$brks, labels = FALSE)
+
+# Plot data with jenks breaks
+ggplot()+
+  geom_sf(data=el_paso, fill='grey')+
+  geom_sf(data=final_hex, aes(fill=as.factor(quintile)), alpha=0.7, color=NA)+
+  scale_fill_manual(values = palette5cont, 
+                    labels = jenks$brks,
+                    name="Ridership\nQuintiles")+
+  labs(title="Hex Bin Grid",
+       subtitle="El Paso, Texas",
+       caption="Total ridership for the year 2022 will be aggregated into each hexbin as the dependent variable,\nin addition to our predictive features.")+
+  mapTheme2
+
+ggplot()+
+  geom_sf(data=el_paso, fill='grey')+
+  geom_sf(data=final_hex, aes(fill=q5(ridership)), alpha=0.7, color=NA)+
+  scale_fill_manual(values = palette5cont,
+                    labels=qBr(ridership),
+                    name="Ridership\nQuintiles")+
+  labs(title="Hex Bin Grid",
+       subtitle="El Paso, Texas",
+       caption="Total ridership for the year 2022 will be aggregated into each hexbin as the dependent variable,\nin addition to our predictive features.")+
+  mapTheme2
+
+ggplot()+ 
+  geom_sf(data = el_paso, fill="lightgrey", color="black", size=80)+
+  geom_sf(data = final_hex, aes(fill = q5(ridership)), color=NA)+
+  scale_fill_manual(values = palette5cont, 
+                     labels = qBr(final_hex, "ridership"),
+                    name="Ridership\nQuintiles") +
+  labs(title="Total Local Ridership by Census Tract",
+       subtitle="El Paso, TX (2022)")+
+  mapTheme
+
+# Cluster the ridership data into 5 groups
+final_hex$ridership_clusters <- kmeans(final_hex$ridership, centers = 5)$cluster
+
+# Create the ggplot
+ggplot() +
+  geom_sf(data = el_paso, fill = "lightgrey", color = "black", size = 0.2) +
+  geom_sf(data = final_hex, aes(fill = ridership_clusters), color = NA) +
+  scale_fill_discrete(values = palette5cont,
+                     name = "Ridership\nClusters",
+                     labels = c("Cluster 1", "Cluster 2", "Cluster 3", "Cluster 4", "Cluster 5")) +
+  labs(title = "Total Local Ridership by Census Tract",
+       subtitle = "El Paso, TX (2022)") +
+  mapTheme
+
+
+
+```
+
+
 
 ## American Community Survey (2019)
 
@@ -911,6 +994,44 @@ grid.arrange(ncol=2,
 )
 ```
 
+```{r race distribution hex, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
+grid.arrange(ncol=3,
+             ggplot()+
+               geom_sf(data=final_hex4, aes(fill=totalPop), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per \nsq km")+
+               labs(title="Total Population")+
+               mapTheme3,
+             ggplot()+
+               geom_sf(data=final_hex4, aes(fill=whitePop), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per \nsq km")+
+               labs(title="White Population")+
+               mapTheme3,
+             ggplot()+
+               geom_sf(data=final_hex4, aes(fill=hlPop), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per \nsq km")+
+               labs(title="Hispanic/Latino Population")+
+               mapTheme3,
+             ggplot()+
+               geom_sf(data=final_hex4, aes(fill=blackPop), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per \nsq km")+
+               labs(title="Black Population")+
+               mapTheme3,
+             ggplot()+
+               geom_sf(data=final_hex4, aes(fill=asianPop), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per \nsq km")+
+               labs(title="Asian Population")+
+               mapTheme3,
+             ggplot()+
+               geom_sf(data=final_hex4, aes(fill=(nhPop+aiPop+otherRacePop+twoPlusRacePop)), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per \nsq km")+
+               labs(title="Other Race Population")+
+               mapTheme3,
+             top="Racial Distribution in El Paso, TX (Total Population per square mile)",
+             bottom="Data: ACS, 2019"
+)
+```
+
+
 ### Household Vacancy
 
 Vacant households may contribute to ridership demand; if units are unoccupied, there is a decreased density of residents and thus less people who may need to utilize buses. There seems to be a relatively random spatial pattern on percentage of vacant housing units. It appears more densified areas such as downtown see higher rates of vacancy.
@@ -942,6 +1063,108 @@ ggplot()+
        caption="Data: ACS, 2020")+
   mapTheme
 ```
+
+```{r}
+ggplot()+
+               geom_sf(data=hex6cleaned, aes(fill=(disability)), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Total")+
+               labs(title="Disabled Population", caption="Data: ACS, 2019")+
+               mapTheme3
+```
+
+```{r}
+grid.arrange(ncol=2,
+ggplot()+
+  geom_sf(data=final_hex4, aes(fill=(jobsPopBalance)), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Score",
+                         breaks=c(0, 0.25, 0.5, 0.75, 1))+
+  labs(title="Jobs to Population Balance")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=final_hex4, aes(fill=(employmentHHMix)), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Score",
+                         breaks=c(0, 0.25, 0.5, 0.75, 1))+
+  labs(title="Employment Household Mix")+
+  mapTheme3,
+bottom="Data: NWI, 2019"
+)
+```
+
+```{r, fig.width=12}
+grid.arrange(ncol=3,
+ggplot()+
+  geom_sf(data=final_hex4, aes(fill=(major_road.nn1)), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Score", breaks=c(0, 1))+
+  labs(title="Distance to Nearest Major Road")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=final_hex4, aes(fill=(parks.nn1)), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Score", breaks=c(0, 1))+
+  labs(title="Distance to Nearest Park")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=final_hex4, aes(fill=(department_stores.nn1)), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Score", breaks=c(0, 1))+
+  labs(title="Distance to Nearest Department Store")+
+  mapTheme3,
+top="Distance to Amenity Features (first nearest neighbor)", bottom="Data: Open Data El Paso, Open Street Map"
+)
+```
+
+```{r fig.width=12}
+grid.arrange(ncol=2,
+ggplot()+
+  geom_sf(data=final_hex4, aes(fill=(stops_in_hex)), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Total")+
+  labs(title="Number of Bus Stops")+
+  mapTheme3+theme(legend.position = "bottom"),
+ggplot()+
+  geom_sf(data=final_hex4, aes(fill=(bays_in_hex)), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Total", )+
+  labs(title="Number of Transfer Bay")+
+  mapTheme3+theme(legend.position = "bottom")
+)
+
+grid.arrange(ncol=2,
+ggplot(final_hex4, aes(x = stops_in_hex, y = ridership)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = palette1) +
+  labs(x = "Bus Stops per hex", y = "Total Ridership", 
+       title = "Bus Stops per hex") +
+  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
+           label = paste0("R^2 = ", round(summary(lm(ridership ~ stops_in_hex, data = final_hex4))$r.squared, 3)))+
+  plotTheme2,
+ggplot(final_hex4, aes(x = bays_in_hex, y = ridership)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = palette1) +
+  labs(x = "Transfer Bay Stops per hex", y = "", 
+       title = "Transfer Bay Stops per hex") +
+  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
+           label = paste0("R^2 = ", round(summary(lm(ridership ~ bays_in_hex, data = final_hex4))$r.squared, 3)))+plotTheme2
+)
+```
+
+
+```{r, fig.width=12}
+grid.arrange(ncol=2,
+ggplot(final_hex4, aes(x = stops_in_hex, y = ridership)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = palette1) +
+  labs(x = "Bus Stops per hex", y = "Total Ridership", 
+       title = "Bus Stops per hex") +
+  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
+           label = paste0("R^2 = ", round(summary(lm(ridership ~ stops_in_hex, data = final_hex4))$r.squared, 3)))+
+  plotTheme2,
+ggplot(final_hex4, aes(x = bays_in_hex, y = ridership)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = palette1) +
+  labs(x = "Transfer Bay Stops per hex", y = "", 
+       title = "Transfer Bay Stops per hex") +
+  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
+           label = paste0("R^2 = ", round(summary(lm(ridership ~ bays_in_hex, data = final_hex4))$r.squared, 3)))+plotTheme2
+)
+```
+
 
 ## Scatterplots
 
