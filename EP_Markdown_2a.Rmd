@@ -1164,6 +1164,7 @@ session_info()
 ## Building the hex grid
 
 ```{r hex crop area, warning=FALSE, message=FALSE, results=FALSE}
+#updates
 bus_routes <- bus_routes %>%
   st_transform(crs=4269)
 
@@ -1212,8 +1213,6 @@ ggplot()+
   labs(title="Hex Bin Grid - El Paso, Texas")+
   mapTheme
 
-ggplot()+
-  geom_sf(data=elpaso_outline)
 ```
 
 ## Aggregated Ridership
