@@ -1172,15 +1172,23 @@ flum_crop <- flum %>%
   st_crop(y = st_bbox(bus_routes))
 
 excludeLU <- c("Fort Bliss Military",
-               "Fort Bliss Mixed Use (Airport)",
                "Preserve",
-               "Industrial and/or Railyards",
                "Remote",
                "Military Reserve")
 
 exclude_area <- flum_crop %>% 
   filter(COMMENTS %in% excludeLU) %>% 
   st_union()
+
+ggplot(flum_crop)+
+  geom_sf(aes(fill = COMMENTS  %in% c("Fort Bliss Military",
+               "Military Reserve", 
+               "Agriculture" ) ),color = NA)+
+   geom_sf(data = flum_crop %>% filter(COMMENTS  == "Agriculture" ), color = NA, fill = 'green')+
+  theme(legend.position = 'none')
+```
+
+```{r }
 
 el_paso <- el_paso %>%
   st_transform(crs=4269)
@@ -1788,4 +1796,8 @@ final_data <- final_data %>% dplyr::select(app_cols)
 ```
 
 ## validating models
+
+```{r}
+
+```
 
