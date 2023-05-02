@@ -198,6 +198,9 @@ palette1 <- c("#C96A52")
 
 palette5cont <- c("#F2F1E4", "#EAD599", "#D19D5D", "#A7552A", "#7D0112")
 
+brioPalette <- c("#B0C72C", "#660066", "#00A8E7", "#FF6E00")
+
+
 sf::sf_use_s2(FALSE)
 options(scipen=999)
 ```
@@ -209,6 +212,9 @@ riderstops <- read.csv(paste(data_folder, "/riderstops1.csv", sep = ''))
 # Transit Lines
 transit_lines <- st_read(paste(data_folder, "/transit_lines.geojson", sep = ''))
 bus_routes <- read_sf(paste(data_folder, "/BusRoutes.geojson", sep = ''))
+# BRIO
+brio <- read_sf(paste(data_folder, "/brio.shp", sep = '')) %>%
+st_transform(st_crs("+proj=utm +zone=10 +datum=WGS84"))
 
 # Bus stops
 stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
@@ -535,7 +541,10 @@ RT_stop_avg_st <- st_drop_geometry(RT_stop_avg) # no geom
 
 ## Acknowledgement
 
-This project was created by Charlie Huemmler, Yingxue Ou, and Jack Rummler as part of the University of Pennsylvania Master of Urban Spatial Analytics practicum. We would like to thank our client, Alex Hoffman, AICP, of the El Paso Capital Improvements Department for his continual knowledge, eagerness to help, and enthusiasm for this project. We also would like to thank Professors Matthew Harris and Michael Fichman for their invaluable mentorship throughout this process.
+This project was created by Charlie Huemmler, Yingxue Ou, and Jack Rummler as part of the University of Pennsylvania's Master of Urban Spatial Analytics and Smart Cities practicum (MUSA 801). We would like to thank our client, Alex Hoffman, AICP, of the El Paso Capital Improvements Department for his continual knowledge, eagerness to help, and enthusiasm for this project. We also would like to thank Professors Matthew Harris, Michael Fichman, and Mjumbe Poe for their invaluable assistance and mentorship throughout this process.
+
+To check out other practicum projects for the MUSA/Smart Cities practicum, click here.
+To check out our web application, click here.
 
 ## Introduction and Use Case
 
@@ -558,23 +567,25 @@ The balance between equity and revenue can often be a challenge for transit agen
 
 For this project, we are building a latent bus transit demand model. From the data we are supplied of on-boarding and off-boarding per route, stop, and day, we built a model to predict bus transit ridership. How this gets completed is through training our model on an 80% subset of our data and testing it on 20% of our data to receive predicted ridership. 
 
-Our data is aggregated to hexbins, which are equally shaped hexbins that act as an overlay on top of the city of El Paso boundary. Total ridership is aggregated into each hexbin to predict what the total ridership is based on the features engineered into our model. We are building three models: a logistic regression model, a Random Forest model, and an XGBoost model.
+Our data is aggregated to hexbins, which are equally shaped hexbins that act as an overlay on top of the city of El Paso boundary. Total ridership is aggregated into each hexbin to predict what the total ridership is based on the features engineered into our model. We built two models: a Random Forest model and an XGBoost model.
 
-We are building this model to inform our client's interest in knowing how bus transit alternative routes will affect route-level and system-level equity and fare revenue implications. In our model, we bake in equity metrics, which highlight the ability for transit-dependent populations to have operable, efficient service, in addition to the accessibility of stops for all El Paso residents. Fare revenue optimization is derived from how profit can be increased based upon new ridership patterns. If our model can accurately predict bus transit ridership, it can inform how new transit routes perform on these indicators, which the web application we develop will evaluate.
+We are building this model to inform our client's interest in knowing how bus transit alternative routes will affect route-level and system-level equity and fare revenue implications. In our model, we bake in equity metrics, which highlight the ability for all residents, and especially transit-dependent populations, to have operable, efficient service, in addition to the accessibility of stops for all El Paso residents. Fare revenue optimization is derived from ridership. A Sun MEtro planner could look at both current routes to see if our predicted ridership is higher or lower than current ridership to understand if there is increased demand for bus routes, or submit new routes to understand route level predicted ridership and how it compares to existing routes.If our model can accurately predict bus transit ridership, it can inform how new transit routes perform on these indicators, which the web application we develop will evaluate.
 
 Thus, this project is two-fold: a predictive bus transit ridership model and a performance-based measurement evaluating the equity and financial implications of transit demand.
 
-**Latent bus transit demand model:** We are predicting bus transit ridership based on 2022 ridership to model demand for transit services in the future. We are building correlative
-
-**Informational Network:** A scoring network to assess ridership on equity and revenue based indicators.
+**Latent bus transit demand model:** We are predicting bus transit ridership based on 2022 ridership to model demand for transit services in the future. We are building correlative features into our model that are predictive of ridership while also maintaining the equity indicators essential to city-wide accessibility and efficiency of bus transit.
+**Informational network web app:** A web app where a Sun Metro planner can input their own .kml file of a new transit line and assess it on fare revenue (ridership) and equity (different independent variables assessing demographic distributions) optimization.
 
 # Exploratory Data Analysis
 
->IN THIS SECTION, WE LOOK AT MORE ON THE CONTEXT OF OUR STUDY REGION AND THE DATA OUR CLIENT PROVIDED<
+In this section, we look at both the context area of El Paso and how it relates to transit ridership, in addition to the data given to us by our client.
+
+**El Paso Context:** El Paso has a unique positionality and geography that makes roadway infrastructure complex, inherently impacting the structure of bus routes.
+**Ridership Data:** The El Paso Capital Improvements Department supplied us with ridership data for the year 2022. This data was collected at every route and stop in the transit network by collecting onboarding and offboarding data using bus sensors. Note that only about 85% of buses had these sensors at any given time, thus there is some inherent bias in the data; however, it does still paint a high level picture of ridership patterns in the city.
 
 ## El Paso Context
 
-El Paso is the sixth-largest city in Texas located at the far western tip of the state, just immediately north of Ciudad Juárez. The city is bounded by the Rio Grande River to the south, the Franklin Mountain Range to the north, and Fort Bliss Military Base to the northeast. The context map below shows the geographical constraints where the Franklin Mountains are represented in light green, Fort Bliss Military Base in dark green, and the Rio Grande River in light blue, overlain on top of population density of the city at a census tract level. As we can see, downtown El Paso is notched in between the mountains and river, with heavy sprawl toward the north and east.
+El Paso is the sixth-largest city in Texas located at the far western tip of the state, just immediately north of Ciudad Juárez in Mexico. The city is bounded by the Rio Grande River to the south, the Franklin Mountain Range to the north, and Fort Bliss Military Base to the northeast. The context map below shows the geographical constraints where the Franklin Mountains are represented in purple, Fort Bliss Military Base in green, and the Rio Grande River in light blue, overlain on top of population density of the city at a census tract level. As we can see, downtown El Paso is notched in between the mountains and river, with heavy sprawl toward the north and east.
 
 ```{r context_map, fig.width=12, warning=FALSE, message=FALSE, results=FALSE}
 ep_bus_routes <- st_intersection(el_paso, bus_routes)
@@ -587,13 +598,13 @@ ggplot() +
   geom_sf(data=franklin, fill=palette6[6], color=palette6[6]) +
   geom_sf(data=ft_bliss, fill=palette6[4], color=palette6[4]) +
   geom_sf(data=bus_routes, color="black") +
-  # labs(caption="El Paso (county) in pink\nEl Paso (city) in grey\nRio Grande River in blue\nFranklin Mountains State Park in purple\nFort Bliss Military Base in olive\nCurrent bus network in black")+
-  mapTheme,
+  labs(caption="El Paso (county) in pink\nEl Paso (city) in grey\nRio Grande River in blue\nFranklin Mountains State Park in purple\nFort Bliss Military Base in olive\nCurrent bus network in black")+
+  mapTheme3,
 ggplot()+
   geom_sf(data=tx, fill='grey', color='black', size=0.5)+
   geom_sf(data=ep_co, fill=palette6[2])+
   theme(panel.background = element_rect(fill = "white"))+
-  mapTheme2
+  mapTheme2, top="El Paso - Context Map"
 )
 ```
 
@@ -612,48 +623,23 @@ ggplot()+
           fill="lightgrey",
           color=NA)+
   geom_sf(data=ep_roads,
-          alpha=0.9, 
+          alpha=0.5, 
           color="black", 
-          size=1)+
+          size=1.5)+
   geom_sf(data=bus_routes,
           alpha=0.9, 
           color="#C96A52FF", 
-          size=1)+
-  ggsn::scalebar(el_paso, location="bottomleft", dist_unit = 'mi', dist=2, height=0.01, transform=TRUE, model='WGS84')+
+          size=1.5)+
+  ggsn::scalebar(el_paso, location="bottomleft", dist_unit = 'mi', dist=5, height=0.01, transform=TRUE, model='WGS84')+
   labs(title="Current Bus Network",
        subtitle="Sun Metro Mass Transit - El Paso, TX",
        caption="Current road network in black\nCurrent bus transit network in orange")+
   mapTheme2
 ```
 
->DISCUSSION ON HOW OUR MODEL ONLY USES LOCAL ROUTES<
-
-```{r context map with local routes, fig.width=12, warning=FALSE, message=FALSE, results=FALSE}
-grid.arrange(ncol=2,
-ggplot()+
-  geom_sf(data=tx, fill='grey', color='black', size=0.5)+
-  geom_sf(data=ep_co, fill=palette6[2])+
-  theme(panel.background = element_rect(fill = "white"))+
-  mapTheme2,
-ggplot() +
-  geom_sf(data=ep_co, fill=palette6[2], color=palette6[2]) +
-  geom_sf(data=el_paso, fill="grey", color='grey') +
-  geom_sf(data=rio, color="blue", fill='blue', size=5000) +
-  geom_sf(data=franklin, fill=palette6[6], color=palette6[6]) +
-  geom_sf(data=ft_bliss, fill=palette6[4], color=palette6[4]) +
-  geom_sf(data=bus_routes, color="black") +
-  geom_sf(data=local, color="red")+
-  labs(caption="El Paso (county) in pink\nEl Paso (city) in grey\nRio Grande River in blue\nFranklin Mountains State Park in purple\nFort Bliss Military Base in olive\nCurrent bus network in black\nLocal routes in red")+
-  mapTheme,
-top="Context Map - El Paso, TX"
-)
-```
-
 ## Analyzing Route Ridership
 
-Next, we looked at current route ridership. We aggregated the dataset to the route level and calculated the total ridership. As stated before, the BRIO bus rapid transit routes dominate in ridership, accounting for approximately 40% of total transit ridership. The three most popular routes are the 205, 206, and 207. The fourth BRIO line, opened in October 2022, still had higher ridership than almost half of other routes. While there are a handful of local ridership routes that have comparable ridership, the trend teeters out, and most local routes experience relatively low ridership. This can be attributed to a variety of factors: there are low demand in these areas. 
-
->MORE DISCUSSION<
+Next, we looked at current route ridership. We aggregated the dataset to the route level and calculated the total ridership. 
 
 ```{r route level ridership bar chart, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 
@@ -674,12 +660,44 @@ ggplot(RT_avg_sum_st, aes(y = total_ridership, x = reorder(factor(RT), -total_ri
   plotTheme+
   theme(axis.text.x = element_text(angle=90))
 ```
+```{r}
+percentage <- RT_avg_sum_st %>%
+  group_by(type) %>%
+  summarize(
+    numOfRoutes = n(),
+    pctOfSystemRidersip = round(sum(total_ridership) / sum(RT_avg_sum_st$total_ridership) * 100, 2))
+
+pctKable <- percentage %>%
+  kable(format = "html", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped")) %>%
+  row_spec(1, bold = T, color = "white", background = palette6[1]) %>%
+  row_spec(2, bold = T, color = "white", background = palette6[2]) %>%
+  row_spec(3, bold = T, color = "white", background = palette6[3])%>%
+  row_spec(4, bold = T, color = "white", background = palette6[4])%>%
+  row_spec(5, bold = T, color = "white", background = palette6[5])%>%
+  row_spec(6, bold = T, color = "white", background = palette6[6]) 
+pctKable
+```
+
+### BRIO 
+
+As stated before, the BRIO bus rapid transit routes dominate in ridership, accounting for approximately 40% of total transit ridership. The three most popular routes are the 205, 206, and 207. The fourth BRIO line, opened in October 2022, still had higher ridership than almost half of other routes. Because they have the most frequent service and connect to 28 out of the 31 local routes, we can logically derive why their ridership patterns are so high.
+
+### Route 59
+
+Route 59 is one of the five express routes that experiences high ridership. According to the state of the system report in July 2022, Route 59 accounted for high ridership, notably for its service frequency and its connectivity between downtown and the Eastside Transit Center.
+
+### Local
+
+Local routes make up the majority of transit roadway infrastructure, and they are the only routes that are relatively unfixed. They also have the most political malleability - transit planning is a very political act, and can often have a lot of political bias in the route methodology, but through our data-oriented approach, we can successfully build an unbiased informational network so transit planners can leverage our findings to build a more interconnected, equitable route network.
+
+While there are a handful of local ridership routes that have comparable ridership to other high ridership routes, the trend teeters out, and most local routes experience relatively low ridership. This can be attributed to a variety of factors: there are low demand in these areas, infrequent service, inaccessibility, or other.
+
+For the purposes of modeling bus transit scenarios, we leverage only local route ridership into our modeling process; however, it is important to analyze the system at large to understand the connectivity of Sun Metro and how local routes can better facilitate increased ridership and greater accessibility throughout the city.
 
 ## Ridership Scatterplot
 
-As the scatter plot indicates, there is a strong correlation between average on-board and off-board frequency. This indicates that in bus transit trips, the average rider may exhibit round-trip behavior, boarding the bus at point A to travel to point B and then returning to point A without any intermediate stops.
-
->GREATER DISCUSSION<
+As the scatter plot indicates, there is a strong correlation between average on-board and average off-board frequency. With an r-squared of 0.92, this indicates that in bus transit trips, the average rider may exhibit round-trip behavior, boarding the bus at point A to travel to point B and then returning to point A without any intermediate stops.
 
 ```{r scatterplot1, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
@@ -698,7 +716,7 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
 
 ## Ridership by Census Tract 
 
->DESCRIPTION<
+Ridership of each stop is aggregated into the census tracts of El Paso (2019) to understand spatial clustering of ridership. Total ridership of each tract is separated into quintiles. As we see below, there is some pretty significant clustering of high ridership in the downtown region, with high ridership falling along significant BRIO corridors. The further we sprawl out into the east and north, the lower ridership is.
 
 ```{r ridership by cen tract, warning=FALSE, message=FALSE, results=TRUE, fig.width=12}
 local1 <- df[df$type %in% "Local", ]
@@ -732,23 +750,58 @@ agg_data2 <- left_join(local_agg_tracts, ep_tracts, by = "GEOID") %>%
   dplyr::select(c("total_ridership", "geometry", "GEOID"))
 
 ggplot()+ 
-  geom_sf(data = el_paso, fill="lightgrey", color="black", size=80)+
-  geom_sf(data = agg_data2, aes(fill = q5(total_ridership)), color="black")+
+  geom_sf(data = el_paso, fill="lightgrey", color="black")+
+  geom_sf(data = agg_data2, aes(fill = q5(total_ridership)), color=NA)+
+  geom_sf(data = brio, fill="black", color="black", size=4000)+
   scale_fill_manual(values = palette5cont, 
-                     labels = c("Bottom 20%", "20% to 40%", "40% to 60%", "60% to 80%", "Top 20%"),
+                    labels = c("Bottom 20%", "20% to 40%", "40% to 60%", "60% to 80%", "Top 20%"),
                     name="Ridership\nQuintiles") +
   labs(title="Total Local Ridership by Census Tract",
-       subtitle="El Paso, TX (2022)")+
-  mapTheme
+       subtitle="El Paso, TX (2022)",
+       caption="")+
+  mapTheme3
 ```
+Along the southwest border, there are several census tracts, that despite having a BRIO line running directly through them, still experience some of the lowest local ridership in the city. This could be a potential area of interest to invest new local ridership in.
 
-## Spatial Lags?
+## Spatial Lags
 
->DESCRIPTION<
+Spatial lags in the context of bus ridership at stops along a route refer to the influence that the level of bus ridership at one stop has on the level of ridership at neighboring stops. In other words, the spatial lag effect suggests that the level of ridership at a particular stop is not only influenced by the characteristics of that stop, but also by the level of ridership at nearby stops. This can play a significant role in understanding ridership patterns in space. We use the three most populous local routes - 14, 50, and 65 - to understand this phenomena.
 
-####
-CODE
-####
+```{r spatial lags, warning=FALSE, message=FALSE, results=TRUE, fig.width=12}
+route14 <- RT_stop_avg %>%
+  filter(RT == 14)
+route50 <- RT_stop_avg[RT_stop_avg['RT'] == 50]
+route65 <- RT_stop_avg[RT_stop_avg['RT'] == 65]
+
+ggplot()+
+  geom_sf(data=route14, aes(size=avg_ons, fill=avg_ons, color=avg_ons))+
+  scale_size_continuous(breaks=c(0, 15, 30, 45, 60, 75))+
+  scale_fill_continuous(breaks=c(0, 15, 30, 45, 60, 75))
+
+
+library(scales)
+ggplot() +
+  geom_sf(data=route14, aes(fill=avg_ons, color=avg_ons, size=avg_ons)) +
+  scale_fill_continuous(name="Average Ons", breaks=c(0, 15, 30, 45, 60), fill=c(palette5cont)) +
+  scale_color_continuous(name="Average Ons", breaks=c(0, 15, 30, 45, 60, 75), fill=c(palette5cont)) +
+  scale_size_continuous(name="Average Ons", breaks=c(0, 15, 30, 45, 60, 75)) +
+  guides(fill = guide_colorbar(title.position = "top", title.hjust = 0.5)) +
+  labs(title = "Route 14 Average Ons by Stop")
+
+
+ggplot() +
+  geom_sf(data=route14, aes(size=avg_ons, fill=avg_ons, color=avg_ons)) +
+  scale_size_continuous(name="Total Ridership", breaks=c(0, 15, 30, 45, 60, 75), guide = guide_legend()) +
+  scale_fill_continuous(name="Average Ons", breaks=c(0, 15, 30, 45, 60, 75)) +
+  scale_color_continuous(name="Average Ons", guide = guide_none()) +
+  guides(fill = guide_legend(title = "Average Ons", title.position = "top", 
+                             label.position = "bottom", barwidth = 15),
+         color = guide_legend(title = "Average Ons", title.position = "top", 
+                              label.position = "bottom", barwidth = 15)) +
+  labs(title = "Route 14 Average Ons by Stop")
+
+
+```
 
 ## Leaflet Map - Total Ridership
 

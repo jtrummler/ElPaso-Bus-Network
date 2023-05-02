@@ -1169,27 +1169,33 @@ bus_routes <- bus_routes %>%
 
 flum_crop <- flum %>%
   st_transform(crs=4269) %>%
-  st_crop(y = st_bbox(bus_routes))
+  st_crop(y = st_bbox(bus_routes)) 
+
 
 excludeLU <- c("Fort Bliss Military",
-               "Preserve",
+               #"Fort Bliss Mixed Use (Airport)",
+               #"Preserve",
+               #"Industrial and/or Railyards",
                "Remote",
-               "Military Reserve")
+               "Military Reserve"
+)
 
 exclude_area <- flum_crop %>% 
   filter(COMMENTS %in% excludeLU) %>% 
   st_union()
 
-ggplot(flum_crop)+
-  geom_sf(aes(fill = COMMENTS  %in% c("Fort Bliss Military",
-               "Military Reserve", 
-               "Agriculture" ) ),color = NA)+
-   geom_sf(data = flum_crop %>% filter(COMMENTS  == "Agriculture" ), color = NA, fill = 'green')+
-  theme(legend.position = 'none')
+franklin <- franklin %>%
+  st_union() %>% st_as_sf() %>% st_transform(crs=4269) %>% st_buffer(dist=0.0005)
+
+airport <- flum_crop %>% filter(OBJECTID == 1540 | COMMENTS  == "Fort Bliss Military" & OBJECTID != 2189) %>% st_buffer(.001) %>% st_union()
+  
+  
+
 ```
 
-```{r }
 
+
+```{r }
 el_paso <- el_paso %>%
   st_transform(crs=4269)
 
@@ -1197,7 +1203,9 @@ elpaso_outline <- el_paso %>%
   st_union() %>% 
   st_sf() %>% 
   st_crop(y = st_bbox(bus_routes)) %>% 
-  st_difference(exclude_area)
+  st_difference(franklin) %>%
+  st_difference(exclude_area) %>% 
+  st_difference(airport)
 
 hex <- st_make_grid(elpaso_outline, 
                     cellsize = .005, 
@@ -1208,12 +1216,14 @@ hex <- st_make_grid(elpaso_outline,
 hex <- hex[elpaso_outline,] %>%
   mutate(uniqueID = rownames(.))
 
+
 ggplot()+
   geom_sf(data=el_paso, fill='grey')+
   geom_sf(data=hex, fill=c(palette1), alpha=0.7)+
   labs(title="Hex Bin Grid - El Paso, Texas")+
   mapTheme
 ```
+
 
 ## Aggregated Ridership
 
@@ -1485,6 +1495,11 @@ vars_net <- vars_net %>%
 final_hex <- merge(final_hex, vars_net, by = "uniqueID")
 ```
 
+
+
+
+
+
 ```{r results='hide', message=FALSE}
 # add features for # of bus stops in hex, # of transit bay bus stops
 busstopnet <- hex %>% st_join(stop_riders_agg_noBRT %>% mutate(stop1 = 1)) %>% mutate(stop1 = replace_na(stop1, 0)) %>% group_by(uniqueID) %>% summarise(stops_in_hex = sum(stop1))
@@ -1495,26 +1510,26 @@ final_hex <- merge(final_hex, busstopnet %>% st_drop_geometry(), by = "uniqueID"
 
 final_hex <- merge(final_hex, busbaysnet %>% st_drop_geometry(), by = "uniqueID") 
 
-final_hex <- final_hex %>% dplyr::select(-contains('CF')) 
+final_hex <- final_hex %>% dplyr::select(-contains('CF'))
 
 
+### remove hexs with bus bays
+bay_hex <- final_hex %>% filter(bays_in_hex > 0)
 
-
-
-#641,1234
-
-final_hex <- final_hex %>% filter(!uniqueID %in% c(641,1234))
-#$mega_bay <- ifelse(final_hex$uniqueID %in% c(188, 365),1,0)
-
-#trying to get spatial smoothing
-# final_hex$lon <- st_coordinates(final_hex)[,1] %>% c()
-# final_hex$lat <- st_coordinates(final_hex)[,2]
-
-
-#make variable for mega_bays
+final_hex <- final_hex %>% filter(bays_in_hex == 0) %>% dplyr::select(-bays_in_hex)
 
 
 ```
+
+```{r}
+ggplot(bay_hex)+
+  geom_sf(fill = 'red', color =NA)+
+  geom_sf(data= final_hex, aes(fill = ridership), color = NA)
+```
+
+
+
+
 
 ### coor plot 
 ```{r}
@@ -1542,7 +1557,7 @@ input <- final_hex  %>%
                        replace = TRUE) )
 
 ### Initial Split for Training and Test
-data_split <- initial_split(input, strata = "ridership", prop = 0.75, group = "mega_bay")
+data_split <- initial_split(input, strata = "ridership", prop = 0.75)
 ep_train <- training(data_split)
 ep_test  <- testing(data_split)
 
@@ -1788,7 +1803,7 @@ final_data <- final_data %>% dplyr::select(app_cols)
 
 
 
-#st_write(final_data, 'final_hex7.geojson', overwrite = T, append = F)
+st_write(final_data, 'THE_FINAL_HEX.geojson', overwrite = T, append = F)
 
 
 
@@ -1798,6 +1813,22 @@ final_data <- final_data %>% dplyr::select(app_cols)
 ## validating models
 
 ```{r}
+output_xgb_cv <- output_xgb_sf %>% mutate(totalPop_q5 = q5(totalPop))
+
+ggplot(output_xgb_cv)+
+  geom_sf(aes(fill = totalPop_q5), color =NA)
+
+val_MAPE_by_hood <- output_xgb_cv %>% 
+  group_by(totalPop_q5) %>% 
+  summarise(RMSE = yardstick::rmse_vec(ridership, prediction),
+         MAE  = yardstick::mae_vec(ridership, prediction),
+         MAPE = yardstick::mape_vec(ridership, prediction)) %>% 
+  ungroup() 
+```
+
+```{r}
+ggplot(val_MAPE_by_hood, aes(x = totalPop_q5 , y = MAE)) +
+  geom_bar(stat = "identity") 
 
 ```
 
