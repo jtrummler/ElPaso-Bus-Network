@@ -15,6 +15,7 @@ library(tidyverse)
 library(scales)
 library(cowplot)
 library(here)
+library(jsonlite)
 ```
 
 ## Ridership graphs 
@@ -26,7 +27,7 @@ data_folder <- file.path(
   here() %>% 
     dirname(), 'data')
 
-final_hex <- read_sf("final_hex6.geojson")
+final_hex <- read_sf("final_hex7.geojson")
 
 #final_hex <- final_data
 
@@ -34,7 +35,72 @@ final_hex <- read_sf("final_hex6.geojson")
 riderstops <- read.csv(paste(data_folder, "/riderstops1.csv", sep = '')) %>%
   na.omit(riderstops[, c("stop_lat", "stop_lon")]) %>% 
   st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4269) %>%
-  dplyr::select(RT)
+  dplyr::select(RT) %>%
+  mutate(
+    type = case_when(
+      RT == 2 ~ "Local",
+      RT == 7 ~ "Local",
+      RT == 10 ~ "Local",
+      RT == 14 ~ "Local",
+      RT == 15 ~ "Local",
+      RT == 24 ~ "Local",
+      RT == 25 ~ "Local",
+      RT == 32 ~ "Local",
+      RT == 33 ~ "Local",
+      RT == 34 ~ "Local",
+      RT == 35 ~ "Local",
+      RT == 36 ~ "Local",
+      RT == 37 ~ "Local",
+      RT == 50 ~ "Local",
+      RT == 51 ~ "Local",
+      RT == 52 ~ "Local",
+      RT == 53 ~ "Local",
+      RT == 54 ~ "Local",
+      RT == 58 ~ "Local",
+      RT == 61 ~ "Local",
+      RT == 62 ~ "Local",
+      RT == 63 ~ "Local",
+      RT == 64 ~ "Local",
+      RT == 65 ~ "Local",
+      RT == 66 ~ "Local",
+      RT == 67 ~ "Local",
+      RT == 68 ~ "Local",
+      RT == 69 ~ "Local",
+      RT == 72 ~ "Local",
+      RT == 74 ~ "Local",
+      RT == 86 ~ "Local",
+      RT == 4 ~ "Circulator",
+      RT == 8 ~ "Circulator",
+      RT == 5 ~ "Express",
+      RT == 6 ~ "Express",
+      RT == 26 ~ "Express",
+      RT == 59 ~ "Express",
+      RT == 76 ~ "Express",
+      RT == 11 ~ "Feeder",
+      RT == 12 ~ "Feeder",
+      RT == 13 ~ "Feeder",
+      RT == 16 ~ "Feeder",
+      RT == 19 ~ "Feeder",
+      RT == 43 ~ "Feeder",
+      RT == 44 ~ "Feeder",
+      RT == 46 ~ "Feeder",
+      RT == 56 ~ "Feeder",
+      RT == 60 ~ "Feeder",
+      RT == 84 ~ "Feeder",
+      RT == 89 ~ "Feeder",
+      RT == 205 ~ "BRIO",
+      RT == 206 ~ "BRIO",
+      RT == 207 ~ "BRIO",
+      RT == 208 ~ "BRIO",
+      RT == 17 ~ "Other",
+      RT == 20 ~ "Other",
+      RT == 21 ~ "Other",
+      RT == 41 ~ "Other",
+      RT == 82 ~ "Other",
+      RT == 87 ~ "Other",
+      RT == 500 ~ "Streetcar"
+    )
+  ) %>% filter(type == 'Local')
 
 
 
@@ -68,7 +134,6 @@ route_hex <- merge %>% group_by(RT) %>%
             employmentHHMix = mean(employmentHHMix, na.rm = T))%>% 
   mutate(sum_race_pct = whitePop + blackPop + asianPop + hlPop + otherRacePop + nhPop + aiPop)
 
-write_json(route_hex,  path =  'route_hex_table')
 
 route_hex <- route_hex %>% mutate( highlight = ifelse(RT == sample(1:nrow(.),1), "y","n"))
 
@@ -130,6 +195,10 @@ grid.arrange(ncol=2,
                mapTheme
 )
 
+
+```
+```{r}
+write_json(route_hex,  path =  'current_routes_db_agg')
 
 ```
 

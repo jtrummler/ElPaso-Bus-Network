@@ -1164,23 +1164,29 @@ session_info()
 ## Building the hex grid
 
 ```{r hex crop area, warning=FALSE, message=FALSE, results=FALSE}
+#updates
 bus_routes <- bus_routes %>%
   st_transform(crs=4269)
 
 flum_crop <- flum %>%
   st_transform(crs=4269) %>%
-  st_crop(y = st_bbox(bus_routes))
+  st_crop(y = st_bbox(bus_routes)) 
+
 
 excludeLU <- c("Fort Bliss Military",
-               "Fort Bliss Mixed Use (Airport)",
-               "Preserve",
-               "Industrial and/or Railyards",
+               #"Fort Bliss Mixed Use (Airport)",
+               #"Preserve",
+               #"Industrial and/or Railyards",
                "Remote",
-               "Military Reserve")
+               "Military Reserve"
+)
 
 exclude_area <- flum_crop %>% 
   filter(COMMENTS %in% excludeLU) %>% 
   st_union()
+
+franklin <- franklin %>%
+  st_union() %>% st_as_sf() %>% st_transform(crs=4269) %>% st_buffer(dist=0.0005)
 
 el_paso <- el_paso %>%
   st_transform(crs=4269)
@@ -1189,6 +1195,7 @@ elpaso_outline <- el_paso %>%
   st_union() %>% 
   st_sf() %>% 
   st_crop(y = st_bbox(bus_routes)) %>% 
+  st_difference(franklin) %>%
   st_difference(exclude_area)
 
 hex <- st_make_grid(elpaso_outline, 
@@ -1205,6 +1212,7 @@ ggplot()+
   geom_sf(data=hex, fill=c(palette1), alpha=0.7)+
   labs(title="Hex Bin Grid - El Paso, Texas")+
   mapTheme
+
 ```
 
 ## Aggregated Ridership
@@ -1763,8 +1771,7 @@ ggplot(output_xgb_sf)+
 # read in final dataset
 
 #final_data <- read_sf("final_hex3.geojson")
-final_data <- left_join(output_xgb_sf %>%  dplyr::select(-medHHInc), acs_race_hex %>% st_drop_geometry(), by = 'uniqueID') %>% 
-   left_join(medHHInc_hex %>% st_drop_geometry(), by = 'uniqueID')
+final_data <- left_join(output_xgb_sf, acs_race_hex %>% st_drop_geometry(), by = 'uniqueID')
 
 final_data <- final_data %>% mutate(
   ridership_per_stop = ifelse(stops_in_hex != 0, ridership / stops_in_hex, 0),
@@ -1781,7 +1788,7 @@ final_data <- final_data %>% dplyr::select(app_cols)
 
 
 
-st_write(final_data, 'final_hex6.geojson', overwrite = T, append = F)
+#st_write(final_data, 'final_hex7.geojson', overwrite = T, append = F)
 
 
 
