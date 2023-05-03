@@ -1,70 +1,75 @@
+import{addHexgrid} from './map.js';
+
 function addHexLayer(filePath, map) {
-    fetch(filePath)
-    .then(response => response.json())
-    .then(data => {
-        console.log(data);
+  const hexButton = document.getElementById("hex-button");
+  let geojsonLayer = null;
 
-        // Find the maximum and minimum ridership values in the dataset
-        const predictedRider = data.features.map(feature => feature.properties.prediction
-          );
-        console.log(predictedRider);
-        const currentRider = data.features.map(feature => feature.properties.ridership);
-        console.log(currentRider);
-        const maxRidership = Math.max(...predictedRider);
-        const minRidership = Math.min(...predictedRider);
+  hexButton.addEventListener("click", () => {
+    if (!geojsonLayer) {
+      fetch(filePath)
+        .then(response => response.json())
+        .then(data => {
+          console.log(data);
 
-        // Define a variable to hold the reference to the BI element in the sidebar
-        const bi = document.getElementById('BI');  
-        const actualChart = document.getElementById('actualChart');
+          // Find the maximum and minimum ridership values in the dataset
+          const predictedRider = data.features.map(feature => feature.properties.prediction);
+          console.log(predictedRider);
+          const currentRider = data.features.map(feature => feature.properties.ridership);
+          console.log(currentRider);
+          const maxRidership = Math.max(...predictedRider);
+          const minRidership = Math.min(...predictedRider);
 
-        // Define the hex color based on the predicted ridership
-        const geojsonLayer = L.geoJSON(data, {
-            style: function(feature) {
-                const ridership = feature.properties.prediction;
-                // Convert the ridership value to a percentage of the range between min and max
-                const percent = (ridership - minRidership) / (maxRidership - minRidership);
-                // Calculate the red, green, and blue components of the fill color
-                const r = Math.round(217 + (47 * percent));
-                const g = Math.round(158 + (65 * (1 - percent)));
-                const b = 57;
-                return {
-                    fillColor: `rgb(${r},${g},${b})`,
-                    fillOpacity: 0.6,
-                    color: 'white',
-                    weight: 0.5
-                };
+          // Define the hex color based on the predicted ridership
+          geojsonLayer = L.geoJSON(data, {
+
+            style: function (feature) {
+              const ridership = feature.properties.prediction;
+              // Convert the ridership value to a percentage of the range between min and max
+              const percent = (ridership - minRidership) / (maxRidership - minRidership);
+              // Calculate the red, green, and blue components of the fill color
+              const r = Math.round(217 + 47 * percent);
+              const g = Math.round(158 + 65 * (1 - percent));
+              const b = 57;
+              return {
+                fillColor: `rgb(${r},${g},${b})`,
+                fillOpacity: 0.6,
+                color: "white",
+                weight: 0.5,
+              };
             },
-            onEachFeature: function(feature, layer) {
-                // Bind a popup to each hexagon displaying the name of the GeoJSON feature
-                layer.bindPopup("<br>Current ridership: "+Math.round(feature.properties.ridership));
-                layer.bindPopup("<br>Predicted ridership: "+Math.round(feature.properties.prediction));
-      
-                // Bind a click event handler to each hexagon to show the age distribution pie chart
-                layer.on('click', function() {
-                    racialChart(feature);
-                    pctCarChart(feature);
-                    amenitiesChart(feature);
-
-                    // Update the content of the BI element with the property values
-                    bi.innerHTML = '<h2>Selected Hexagon</h2>' +
-                    '<p>Total Housing Units: ' + Math.round(feature.properties.totalHU) + '</p>' +
-                    '<p>Total Jobs: ' + Math.round(feature.properties.total_jobs) + '</p>' +
-                    '<p>Median Houshold Income: ' + Math.round(feature.properties.medHHInc) + '</p>' +
-                    '<p>Disability: ' + Math.round(feature.properties.disability) + '</p>' ;
-
-                    // plot the jitter
-                    jitterPlot(currentRider, feature.properties.ridership, 'currentChart', 'Current Ridership');
-                    jitterPlot(predictedRider, feature.properties.prediction, 'predictedChart', 'Predict Ridership');
-
+            onEachFeature: function (feature, layer) {
+              layer.on('mouseover', function (e) {
+                layer.setStyle({
+                  color: "#ffb545", // set boundary color to orange
+                  weight: 5, // set boundary weight to 2
+                  shadowBlur: 10, // add a shadow effect
+                  shadowColor: "#000" // set shadow color to black
                 });
-              }
-        });
-        geojsonLayer.addTo(map);
-    })
-    .catch(error => console.error(error));
+                layer.openPopup(); // open popup on mouse hover
+              });
+              layer.on('mouseout', function (e) {
+                geojsonLayer.resetStyle(layer); // reset layer style on mouse out
+                layer.closePopup(); // close popup on mouse out
+              });
+              // Bind a popup to each hexagon displaying the name of the GeoJSON feature
+              layer.bindPopup("Current Ridership: "+ Math.round(feature.properties.ridership)+"<br>Predicted Ridership: " + Math.round(feature.properties.prediction), {
+                className: "my-popup-style"
+              });
+            }
+            
+          });
+          geojsonLayer.addTo(map);
+        })
+        .catch(error => console.error(error));
+    } else {
+      map.removeLayer(geojsonLayer);
+      addHexgrid(map, './data/final_hex.geojson');
+    }
+  });
 
-    return map;
+  return map;
 }
+
 
 
 function jitterPlot(ridership, select, chartId, title) {

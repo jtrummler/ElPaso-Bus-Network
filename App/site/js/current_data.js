@@ -25,10 +25,18 @@ function addStopsAndRoutesLayer(stopsPath, routesPath, map) {
                 },
                 onEachFeature: function(feature, layer) {
                     // Bind a popup to each circle marker displaying the name of the GeoJSON feature
-                    layer.bindPopup(feature.properties.TP +
-                        "<br>Average offs: " + feature.properties.avg_offs.toFixed(2) +
-                        "<br>Average ons: " + feature.properties.avg_ons.toFixed(2));
-
+                    var popupContent = "<div class='my-popup-style'>" +
+                                          feature.properties.TP +
+                                          "<br>Average offs: " + feature.properties.avg_offs.toFixed(2) +
+                                          "<br>Average ons: " + feature.properties.avg_ons.toFixed(2) +
+                                       "</div>";
+                    layer.bindPopup(popupContent);
+                  
+                    // Customize the popup style
+                    layer.on('popupopen', function () {
+                      var popup = this.getPopup();
+                      popup.getElement().classList.add('my-popup-style');
+                    });
                 }
         });
 
@@ -43,27 +51,40 @@ function addStopsAndRoutesLayer(stopsPath, routesPath, map) {
         // Get the selected route from the drop-down menu
         const routesSelect = document.getElementById('routes-select');
 
-        
 
         // Add an event listener for the drop-down menu
         routesSelect.addEventListener('change', function() {
             const selectedRoute = this.value;
             updateChart(selectedRoute);
 
+            // create a bounds to stroe latlng
+            const routeBounds = L.latLngBounds();
 
             geojsonLayer.eachLayer(function(layer) {
                 
                 const layerRoute = layer.feature.properties.RT.toString();
+
+                console.log(layer)
+
                 if (selectedRoute && layerRoute !== selectedRoute) {
                     // Hide the layer if it doesn't match the selected route
                     layer.setStyle({ opacity: 0, fillOpacity: 0 });
+                    
                 } else {
                     // Show the layer if it matches the selected route
                     layer.setStyle({ opacity: 1, fillOpacity: 0.5 });
-                    // Zoom in on the selected route
-                    // map.fitBounds(layer.getBounds());
+
+                    
+                    console.log(layer.feature.properties);
+
+                    var point = L.latLng(layer.feature.properties.latitude, layer.feature.properties.longitude);
+                    routeBounds.extend(point);
                 }
+                
             });
+            // Zoom in on the selected route
+            map.fitBounds(routeBounds);
+
 
             updateLine(routesPath, map, selectedRoute);
 

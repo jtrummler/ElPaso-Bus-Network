@@ -37,7 +37,8 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.js"></script>
         <script src="https://d3js.org/d3.v7.min.js"></script>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-        </head>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  </head>
 
 
   <body onload="openPopup()">
@@ -47,13 +48,13 @@
           <button onclick="closePopup()">X</button>
         </div>
         <div id="popup-content">
-            <p>Welcome to our <strong>El Paso Bus</strong> webpage! Here's a quick guide to the four buttons on the right top:</p>
+            <p>Welcome to our <strong>El Paso Bus</strong> webpage! We're excited to offer you the following features:</p>
             <br>
             <ul>
-                <li><strong>Current Routes -></strong> Click to view the current bus routes system in El Paso with their current ridership.</li>
-                <li><strong>Predict Model -></strong> Click to view our prediction ridership model in hexbin format. Click on each hexbin to see the ridership data and some social data.</li>
-                <li><strong>Import Routes -></strong> Click to import routes from your local device. The ridership will be calculated based on which hex bins the routes crossed.</li>
-                <li><strong>GitHub Pages -></strong> Click to visit our GitHub page if you find our project interesting.</li>
+              <li><strong>Current Routes -></strong> Feel free to explore the current El Paso bus routes net. You can hover over the line that you're interested in to find more information.</li>
+              <li><strong>Predict Ridership -></strong> Click to view our predicted ridership model in hexbin format. You can also hover over the hexbin that you're interested in to find more information.</li>
+              <li><strong>Current Ridership -></strong> You can also explore the current ridership in routes level by clicking this button. The graphs in the dashboard below illustrate key data distribution from the economics and equity perspective.</li>
+              <li><strong>Import Routes -></strong> If you want to calculate the data of the routes that you design, please upload a GeoJSON file using this button. The key data will be presented in the dashboard.</li>
             </ul>
             <br>
             <p>Thank you for using our webpage!</p>
@@ -64,24 +65,26 @@
         <div id="label">
             <img src="./image/logo.png" alt="Logo" class="logo"/>
             <form id="import_routes_form" enctype="multipart/form-data" class="button_list">
+                <button id="hex-button" class="button-89" role="button" type="button">Predict Ridership</button>
+
                 <div>
-                    <button id="ridership-button" class="button-89" role="button" type="button">Current Routes</button>
+                    <button id="ridership-button" class="button-89" role="button" type="button">Current Ridership</button>
                     <select id="routes-select"></select>
                 </div>
 
-                <button id="hex-button" class="button-89" role="button" type="button">Predict Model</button>
-
                 <button class="button-89" id="import-button" type="button">Import Routes</button>
-                <input type="file" name="network_kml" id="file-input" accept=".kml,.geojson" style="display:none">
+                <input type="file" name="network_geojson" id="file-input" accept=".geojson" style="display:none">
 
-                <button class="button-89" id="github-button" type="button">GitHub Pages</button>
+                <div id="scenario"></div>
+
+                <!-- <button class="button-89" id="github-button" type="button">GitHub Pages</button> -->
             </form>
         </div>
 
         <div id="content">
           <div class="eco-part">
             <div class="dashboard_title">
-              <h1>Economics</h1>
+              <h1>Economic</h1>
             </div>
             <div class="eco-content">
               <div class="single-jitter">
@@ -100,7 +103,7 @@
             </div>
             <div class="eq-content">
               <div class="multi-jitter">
-                <h2>Racial</h2>
+                <h2>Races</h2>
                   <div class="jitter-content" id="Races"></div>
               </div>
               <div class="single-jitter">
@@ -108,11 +111,11 @@
                 <div class="jitter-content" id="Disability"></div>
               </div>
               <div class="single-jitter">
-                <h2>HH Income</h2>
+                <h2>Household Income</h2>
                 <div class="jitter-content" id="HH-Income"></div>
               </div>
               <div class="single-jitter">
-                <h2>Jobs/HH</h2>
+                <h2>Jobs/Household</h2>
                 <div class="jitter-content" id="Jobs-HH"></div>
               </div>
             </div>
