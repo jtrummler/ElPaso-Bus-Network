@@ -7,7 +7,7 @@ output:
     code_folding: hide
 ---
 
-
+```{=html}
 <style>
   .superbigimage {
     overflow-x:scroll;
@@ -18,7 +18,7 @@ output:
     max-width: none;
   }
 </style>
-
+```
 # Introduction
 
 ```{r setup, warning=FALSE, message=FALSE, include=FALSE}
@@ -200,7 +200,6 @@ palette5cont <- c("#F2F1E4", "#EAD599", "#D19D5D", "#A7552A", "#7D0112")
 
 brioPalette <- c("#B0C72C", "#660066", "#00A8E7", "#FF6E00")
 
-
 sf::sf_use_s2(FALSE)
 options(scipen=999)
 ```
@@ -215,6 +214,8 @@ bus_routes <- read_sf(paste(data_folder, "/BusRoutes.geojson", sep = ''))
 # BRIO
 brio <- read_sf(paste(data_folder, "/brio.shp", sep = '')) %>%
 st_transform(st_crs("+proj=utm +zone=10 +datum=WGS84"))
+
+brio2 <- read_sf(paste(data_folder, "/brio.shp", sep = '')) %>% st_transform(crs=4269)
 
 # Bus stops
 stops <- read.csv(paste(data_folder, "/stops.csv", sep = ''))
@@ -270,6 +271,13 @@ local_transit_bays <- read_sf(paste(data_folder, "/local_transit_bays.csv", sep 
 final_hex4 <- read_sf(paste(data_folder, "/final_hex4.geojson", sep = ''))
 final_hex6 <- read_sf(paste(data_folder, "/final_hex6.geojson", sep = ''))
 hex6cleaned <- final_hex6[!duplicated(final_hex6$uniqueID), ]
+final_hex7 <- read_sf(paste(data_folder, "/final_hex7.geojson", sep = ''))
+hex_cleaned <- read_sf(paste(data_folder, "/THE_FINAL_HEX.geojson", sep = ''))
+hex_final <- read_sf(paste(data_folder, "/xgb_output.geojson", sep = '')) %>% st_drop_geometry()
+
+#### match geoms 
+hex_cleaned2 <- hex_cleaned %>% dplyr::select(c("uniqueID", "geometry"))
+hex_final <- merge(hex_cleaned2, hex_final, by = "uniqueID")
 
 # Different Geographies 
 
@@ -449,7 +457,6 @@ classified <- na.omit(classified)
 local <- classified[classified$type %in% "Local", ]
 ```
 
-
 ```{r different ridership df aggregations, warning=FALSE, message=FALSE, results=FALSE}
 # Aggregating at route level for average and total ridership 
 RT_avg_sum <- df %>%
@@ -543,45 +550,44 @@ RT_stop_avg_st <- st_drop_geometry(RT_stop_avg) # no geom
 
 This project was created by Charlie Huemmler, Yingxue Ou, and Jack Rummler as part of the University of Pennsylvania's Master of Urban Spatial Analytics and Smart Cities practicum (MUSA 801). We would like to thank our client, Alex Hoffman, AICP, of the El Paso Capital Improvements Department for his continual knowledge, eagerness to help, and enthusiasm for this project. We also would like to thank Professors Matthew Harris, Michael Fichman, and Mjumbe Poe for their invaluable assistance and mentorship throughout this process.
 
-To check out other practicum projects for the MUSA/Smart Cities practicum, click here.
-To check out our web application, click here.
+To check out other practicum projects for the MUSA/Smart Cities practicum, click [here](https://pennmusa.github.io/MUSA_801.io/). To check out our web application, click [here](https://chuembucket.github.io/ElPaso-Bus-Network1/App/site/). To check our Github Pages, click [here](https://github.com/jtrummler/ElPaso-Bus-Network).
 
 ## Introduction and Use Case
 
->   "El Paso, often forgotten, is building a stronger transit network than most US cities."  
->   Christof Spieler (Trains, Buses, People) 
+> "El Paso, often forgotten, is building a stronger transit network than most US cities."\
+> Christof Spieler (Trains, Buses, People)
 
-Transit ridership is often a key metric to assess the efficiency of public transportation systems. Like many transit agencies in the last decade, there has been annual decreases in transit ridership, with the sharpest decline in ridership at the beginning of the COVID-19 pandemic. While many transit agencies are finally beginning to see comparable transit ridership now as compared to pre-2020, transit agencies are still grappling with how to maintain existing riders and lure new riders through trustworthy and connected service.
+Transit ridership is often a key metric to assess the efficiency of public transportation systems. Like many transit agencies in the last decade, there has been an annual decrease in transit ridership, with the sharpest decline in ridership at the beginning of the COVID-19 pandemic. While many transit agencies are finally beginning to see comparable transit ridership now as compared to pre-2020, transit agencies are still grappling with how to maintain existing riders and lure new riders through trustworthy and interconnected service.
 
 Sun Metro Mass Transit Department, referred to as Sun Metro, is the transportation provider in El Paso, Texas and is a department of the city of El Paso. Sun Metro has experienced a similar nationwide trend of declining ridership for several years prior to the pandemic and a sharp decrease in ridership and service during and post-pandemic. Moreover, Sun Metro has made several expansions to its transit service in the past decade, which include but are not limited to:
 
-**Bus Rapid Transit (BRIO):** Introduced four BRIO lines between 2014 and 2022, which experience the agency’s highest ridership and most frequent service.  
-**Streetcar Network:** Re-ignited the streetcar network in 2018 using restored PCC streetcars, providing more circuitous service in downtown, uptown, and University of Texas at El Paso.  
-**El Paso Upper East Side Transit Center:** New transit center connected to the Five Points Transit Center, the Montana BRIO line, and more park-and-ride services.  
+**Bus Rapid Transit (BRIO):** Introduced four BRIO lines between 2014 and 2022, which experience the agency's highest ridership and most frequent service.\
+**Streetcar Network:** Re-ignited the streetcar network in 2018 using restored PCC streetcars, providing more circuitous service in downtown, uptown, and University of Texas at El Paso.\
+**El Paso Upper East Side Transit Center:** New transit center connected to the Five Points Transit Center, the Montana BRIO line, and more park-and-ride services.
 
-Now, Sun Metro experiences about 63% of pre-pandemic ridership numbers, but the agency is looking to explore the implications of new bus transit alternative scenarios given its service expansions and future growth trajectory. Particularly, it is looking at ways to maximize equity and accessibility in addition to fare revenue optimization.
+In 2022, Sun Metro experienced about 65% of pre-pandemic ridership numbers, but the agency is looking to explore the implications of new bus transit alternative scenarios given its service expansions and future growth trajectory. Particularly, it is looking at ways to maximize equity and accessibility in addition to fare revenue optimization.
 
-The balance between equity and revenue can often be a challenge for transit agencies to balance. While agencies want to provide access to transit for all of its residents, and particularly those who may be transit-dependent for all of their trips, this means placing bus stops in under-resourced neighborhoods that may not be profitable for the agency. Our client revealed that the El Paso Capital Improvements Department is looking to invest a certain percentage of annual funds toward under-resourced areas. Our group defined equity as both the ability for all El Paso residents to have reasonable access to a bus stop while prioritizing transit-dependent populations.
+The balance between equity and revenue can often be a challenge for transit agencies to balance. While agencies want to provide access to transit for all of its residents, and particularly those who may be transit-dependent for all of their trips, this means placing bus stops in under-resourced neighborhoods that may not be profitable for the agency. Our client revealed that the El Paso Capital Improvements Department is looking to invest a certain percentage of annual funds toward under-resourced areas.
+
+Our team defined equity optimization as balancing the service distribution among all populations regardless of race, socioeconomic status, ability, and other demographic variables. We also defined fare revenue optimization as maximizing total ridership to ensure routes have profitability for Sun Metro.
 
 ## Methodology
 
-For this project, we are building a latent bus transit demand model. From the data we are supplied of on-boarding and off-boarding per route, stop, and day, we built a model to predict bus transit ridership. How this gets completed is through training our model on an 80% subset of our data and testing it on 20% of our data to receive predicted ridership. 
+For this project, we are building a latent bus transit demand model. We are supplied ridership data for the year 2022, which contains number of on-boardings and off-boardings per route, stop, and day. We built a model to predict bus transit ridership training our model on an 80% subset of our data and testing it on 20% of our data to receive predicted ridership.
 
-Our data is aggregated to hexbins, which are equally shaped hexbins that act as an overlay on top of the city of El Paso boundary. Total ridership is aggregated into each hexbin to predict what the total ridership is based on the features engineered into our model. We built two models: a Random Forest model and an XGBoost model.
+Our data is aggregated to hexbins, which are equally shaped hexagons that act as an overlay on top of the city of El Paso boundary. Total ridership is aggregated into each hexbin to predict what the total ridership is based on the features engineered into our model. We built two models: a Random Forest model and an XGBoost model, but ultimately used the XGBoost model.
 
-We are building this model to inform our client's interest in knowing how bus transit alternative routes will affect route-level and system-level equity and fare revenue implications. In our model, we bake in equity metrics, which highlight the ability for all residents, and especially transit-dependent populations, to have operable, efficient service, in addition to the accessibility of stops for all El Paso residents. Fare revenue optimization is derived from ridership. A Sun MEtro planner could look at both current routes to see if our predicted ridership is higher or lower than current ridership to understand if there is increased demand for bus routes, or submit new routes to understand route level predicted ridership and how it compares to existing routes.If our model can accurately predict bus transit ridership, it can inform how new transit routes perform on these indicators, which the web application we develop will evaluate.
+We are building this model to inform our client's interest in knowing how bus transit alternative routes will affect route-level equity and fare revenue implications. In our model, we bake in equity metrics, which highlight the ability for all residents, and especially transit-dependent populations, to have operable, efficient service, in addition to the accessibility of stops for all El Paso residents. Fare revenue optimization is derived from ridership. A Sun Metro planner could look at both current routes to see if our predicted ridership is higher or lower than current ridership to understand if there is increased demand for bus transit, or submit new routes to understand route level predicted ridership and how it compares to existing routes predicted ridership. If our model can accurately predict bus transit ridership, it can inform how new transit routes perform on these indicators, which the web application we develop will evaluate.
 
 Thus, this project is two-fold: a predictive bus transit ridership model and a performance-based measurement evaluating the equity and financial implications of transit demand.
 
-**Latent bus transit demand model:** We are predicting bus transit ridership based on 2022 ridership to model demand for transit services in the future. We are building correlative features into our model that are predictive of ridership while also maintaining the equity indicators essential to city-wide accessibility and efficiency of bus transit.
-**Informational network web app:** A web app where a Sun Metro planner can input their own .kml file of a new transit line and assess it on fare revenue (ridership) and equity (different independent variables assessing demographic distributions) optimization.
+**Latent bus transit demand model:** We are predicting bus transit ridership based on 2022 ridership to model demand for transit services in the future. We are building correlative features into our model that are predictive of ridership while also maintaining the equity indicators essential to city-wide accessibility and efficiency of bus transit. **Informational network web app:** A web app where a Sun Metro planner can input their own .kml file of a new transit line and assess it on fare revenue (ridership) and equity (different independent variables assessing demographic distributions) optimization.
 
 # Exploratory Data Analysis
 
 In this section, we look at both the context area of El Paso and how it relates to transit ridership, in addition to the data given to us by our client.
 
-**El Paso Context:** El Paso has a unique positionality and geography that makes roadway infrastructure complex, inherently impacting the structure of bus routes.
-**Ridership Data:** The El Paso Capital Improvements Department supplied us with ridership data for the year 2022. This data was collected at every route and stop in the transit network by collecting onboarding and offboarding data using bus sensors. Note that only about 85% of buses had these sensors at any given time, thus there is some inherent bias in the data; however, it does still paint a high level picture of ridership patterns in the city.
+**El Paso Context:** El Paso has a unique positionality and geography that makes roadway infrastructure complex, inherently impacting the structure of bus routes. **Ridership Data:** The El Paso Capital Improvements Department supplied us with ridership data for the year 2022. This data was collected at every route and stop in the transit network by collecting onboarding and offboarding data using bus sensors. Note that only about 85% of buses had these sensors at any given time, thus there is some inherent bias in the data; however, it does still paint a high level picture of ridership patterns in the city.
 
 ## El Paso Context
 
@@ -639,11 +645,38 @@ ggplot()+
 
 ## Analyzing Route Ridership
 
-Next, we looked at current route ridership. We aggregated the dataset to the route level and calculated the total ridership. 
+```{r routes in maps, fig.width=12,warning=FALSE, message=FALSE, results=FALSE}
+route_type_agg <- merge(RT_avg_sum_st, bus_routes, by.x = "RT", by.y = "ROUTE") %>% st_sf() %>%
+  dplyr::select(c("RT", "type", "geometry")) %>% st_transform(crs=4269)
+
+localRT <- subset(route_type_agg, type %in% 'Local')
+circulatorRT <- subset(route_type_agg, type %in% 'Circulator')
+expressRT <- subset(route_type_agg, type %in% 'Express')
+feederRT <- subset(route_type_agg, type %in% "Feeder")
+
+grid.arrange(ncol=3,
+ggplot()+
+  geom_sf(data=el_paso, fill="black")+
+  geom_sf(data=brio2, color=palette6[1], fill=palette6[1], size=3)+
+  labs(title="BRIO") + mapTheme,
+ggplot()+geom_sf(data=el_paso, fill="black")+
+  geom_sf(data=circulatorRT, color=palette6[2], fill=palette6[2], size=3)+
+  labs(title="Circulator") + mapTheme,
+ggplot()+geom_sf(data=el_paso, fill="black")+
+  geom_sf(data=expressRT, color=palette6[3], fill=palette6[3], size=3)+
+  labs(title="Express") + mapTheme,
+ggplot()+geom_sf(data=el_paso, fill="black")+
+  geom_sf(data=feederRT, color=palette6[4], fill=palette6[4], size=3)+
+  labs(title="Feeder") + mapTheme,
+ggplot()+geom_sf(data=el_paso, fill="black")+
+  geom_sf(data=localRT, color=palette6[5], fill=palette6[5], size=3)+
+  labs(title="Local") + mapTheme
+)
+```
+
+Next, we looked at current route ridership. We aggregated the dataset to the route level and calculated the total ridership of each route.
 
 ```{r route level ridership bar chart, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
-
-
 #merged <- merge(transit_lines, RT_avg_sum_st, by.x = "route_short_name", by.y = "RT")
 
 RT_avg_sum_st <- RT_avg_sum_st[order(-RT_avg_sum_st$total_ridership),]
@@ -660,7 +693,8 @@ ggplot(RT_avg_sum_st, aes(y = total_ridership, x = reorder(factor(RT), -total_ri
   plotTheme+
   theme(axis.text.x = element_text(angle=90))
 ```
-```{r}
+
+```{r percentage, include=TRUE, results=TRUE, fig.width=12}
 percentage <- RT_avg_sum_st %>%
   group_by(type) %>%
   summarize(
@@ -679,7 +713,7 @@ pctKable <- percentage %>%
 pctKable
 ```
 
-### BRIO 
+### BRIO
 
 As stated before, the BRIO bus rapid transit routes dominate in ridership, accounting for approximately 40% of total transit ridership. The three most popular routes are the 205, 206, and 207. The fourth BRIO line, opened in October 2022, still had higher ridership than almost half of other routes. Because they have the most frequent service and connect to 28 out of the 31 local routes, we can logically derive why their ridership patterns are so high.
 
@@ -689,9 +723,9 @@ Route 59 is one of the five express routes that experiences high ridership. Acco
 
 ### Local
 
-Local routes make up the majority of transit roadway infrastructure, and they are the only routes that are relatively unfixed. They also have the most political malleability - transit planning is a very political act, and can often have a lot of political bias in the route methodology, but through our data-oriented approach, we can successfully build an unbiased informational network so transit planners can leverage our findings to build a more interconnected, equitable route network.
+Local routes make up the majority of transit roadway infrastructure, and they are the only routes that are unfixed. They also have the most political malleability - transit planning is a very political act, and can often have a lot of bias in the route methodology, but through our data-oriented approach, we can successfully build an unbiased informational network so transit planners can leverage our findings to build a more interconnected, equitable route network.
 
-While there are a handful of local ridership routes that have comparable ridership to other high ridership routes, the trend teeters out, and most local routes experience relatively low ridership. This can be attributed to a variety of factors: there are low demand in these areas, infrequent service, inaccessibility, or other.
+While there are a handful of local ridership routes that have comparable ridership to higher demand routes, like BRIO and Route 59, the trend teeters out, and most local routes experience relatively low ridership. This can be attributed to a variety of factors: there are low demand in these areas, infrequent service, inaccessibility, or other.
 
 For the purposes of modeling bus transit scenarios, we leverage only local route ridership into our modeling process; however, it is important to analyze the system at large to understand the connectivity of Sun Metro and how local routes can better facilitate increased ridership and greater accessibility throughout the city.
 
@@ -714,7 +748,7 @@ ggplot(RT_stop_avg_st, aes(x = avg_ons, y = avg_offs)) +
   plotTheme
 ```
 
-## Ridership by Census Tract 
+## Ridership by Census Tract
 
 Ridership of each stop is aggregated into the census tracts of El Paso (2019) to understand spatial clustering of ridership. Total ridership of each tract is separated into quintiles. As we see below, there is some pretty significant clustering of high ridership in the downtown region, with high ridership falling along significant BRIO corridors. The further we sprawl out into the east and north, the lower ridership is.
 
@@ -758,68 +792,34 @@ ggplot()+
                     name="Ridership\nQuintiles") +
   labs(title="Total Local Ridership by Census Tract",
        subtitle="El Paso, TX (2022)",
-       caption="")+
+       caption="BRIO Routes in black")+
   mapTheme3
 ```
+
 Along the southwest border, there are several census tracts, that despite having a BRIO line running directly through them, still experience some of the lowest local ridership in the city. This could be a potential area of interest to invest new local ridership in.
-
-## Spatial Lags
-
-Spatial lags in the context of bus ridership at stops along a route refer to the influence that the level of bus ridership at one stop has on the level of ridership at neighboring stops. In other words, the spatial lag effect suggests that the level of ridership at a particular stop is not only influenced by the characteristics of that stop, but also by the level of ridership at nearby stops. This can play a significant role in understanding ridership patterns in space. We use the three most populous local routes - 14, 50, and 65 - to understand this phenomena.
-
-```{r spatial lags, warning=FALSE, message=FALSE, results=TRUE, fig.width=12}
-route14 <- RT_stop_avg %>%
-  filter(RT == 14)
-route50 <- RT_stop_avg[RT_stop_avg['RT'] == 50]
-route65 <- RT_stop_avg[RT_stop_avg['RT'] == 65]
-
-ggplot()+
-  geom_sf(data=route14, aes(size=avg_ons, fill=avg_ons, color=avg_ons))+
-  scale_size_continuous(breaks=c(0, 15, 30, 45, 60, 75))+
-  scale_fill_continuous(breaks=c(0, 15, 30, 45, 60, 75))
-
-
-library(scales)
-ggplot() +
-  geom_sf(data=route14, aes(fill=avg_ons, color=avg_ons, size=avg_ons)) +
-  scale_fill_continuous(name="Average Ons", breaks=c(0, 15, 30, 45, 60), fill=c(palette5cont)) +
-  scale_color_continuous(name="Average Ons", breaks=c(0, 15, 30, 45, 60, 75), fill=c(palette5cont)) +
-  scale_size_continuous(name="Average Ons", breaks=c(0, 15, 30, 45, 60, 75)) +
-  guides(fill = guide_colorbar(title.position = "top", title.hjust = 0.5)) +
-  labs(title = "Route 14 Average Ons by Stop")
-
-
-ggplot() +
-  geom_sf(data=route14, aes(size=avg_ons, fill=avg_ons, color=avg_ons)) +
-  scale_size_continuous(name="Total Ridership", breaks=c(0, 15, 30, 45, 60, 75), guide = guide_legend()) +
-  scale_fill_continuous(name="Average Ons", breaks=c(0, 15, 30, 45, 60, 75)) +
-  scale_color_continuous(name="Average Ons", guide = guide_none()) +
-  guides(fill = guide_legend(title = "Average Ons", title.position = "top", 
-                             label.position = "bottom", barwidth = 15),
-         color = guide_legend(title = "Average Ons", title.position = "top", 
-                              label.position = "bottom", barwidth = 15)) +
-  labs(title = "Route 14 Average Ons by Stop")
-
-
-```
 
 ## Leaflet Map - Total Ridership
 
->LEAFLET DESCRIPTION<
+Finally, we created a Leaflet map to allow interactivity with El Paso, and broke down total local ridership in 2022 to a quintile level. You can check out the map with this [link](https://jtrummler.github.io/el-paso-ridership-2022/).
 
-####
-INSERTION OF LEAFLET CODE AND/OR LINK TO LEAFLET
-####
+[IMAGES]
+
+Some insights we derived from this map:
+
+1.  Downtown clustering: High ridership can be found in the downtown region of El Paso, given the population and job density, high density of stops and intersections, the convergence of multiple BRIO routes, and the downtown transfer bay.
+2.  High ridership along BRIO corridors: since several local routes connect to essential BRIO corridors, you can observe high ridership along many of these roads, such as Mesa and Montana. Leveraging connectivity to existing BRIO routes can encourage multi-modality and provide greater access to more frequent service provision.
+3.  Sprawl and ridership: The further we sprawl to the north and east, we see less overall ridership, and less frequency of stops to fall into higher ridership quintiles.
+4.  Southeast/I-10 corridor: Along the southeastern part of the city along the Mexico border, we see a clustering of stops with very low ridership, despite having several local routes connecting this region and a BRIO line. This may be for a variety of reasons such as low frequency in existing routes or high automobile dependency in this area.
 
 # Feature Engineering
 
->DISCUSSION OF FEATURES CHOSEN<
-
->TABLE OF FEATURES<
+Our feature engineering process is broken into two parts: an explanation of our spatial unit and the features we chose to aggregate.
 
 ## Spatial Unit: Hexbins
 
->DISCUSSION OF HEXBINS, THE PROCESS OF CHOOSING ETC.<
+Hexbins are a way to create a uniform spatial structure across our study region for the sake of creating a granular analysis of our region. We aggregate total ridership into each hexbin, split our data into training and test sets, and get predicted ridership for each hexagon.
+
+We delineated our hexbins by cropping to only existing transit line infrastructure and removing land uses that would be non-conducive to transit ridership. We also removed hexes that posed great outliers: particularly a downtown hex and hexes with transfer bays. We deemed this necessary to improve both the accuracy of the model while knowing transit planners already know to link bus routes with essential connections such as these regions. Our final hexbin map is presented below.
 
 ```{r hex crop area, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 bus_routes <- bus_routes %>%
@@ -860,76 +860,28 @@ hex <- hex[elpaso_outline,] %>%
 
 ggplot()+
   geom_sf(data=el_paso, fill='grey')+
-  geom_sf(data=final_hex, fill=c(palette1), alpha=0.7)+
+  geom_sf(data=hex_cleaned, fill=c(palette1), alpha=0.7)+
   labs(title="Hex Bin Grid",
   subtitle="El Paso, Texas",
   caption="Total ridership for the year 2022 will be aggregated into each hexbin as the dependent variable,\nin addition to our predictive features.")+
-  mapTheme
-```
-```{r}
-jenks <- classIntervals(final_hex$ridership, n = 5, style = "jenks")
-
-# Create categorical variable based on jenks breaks
-final_hex$quintile <- cut(final_hex$ridership, jenks$brks, labels = FALSE)
-
-# Plot data with jenks breaks
-ggplot()+
-  geom_sf(data=el_paso, fill='grey')+
-  geom_sf(data=final_hex, aes(fill=as.factor(quintile)), alpha=0.7, color=NA)+
-  scale_fill_manual(values = palette5cont, 
-                    labels = jenks$brks,
-                    name="Ridership\nQuintiles")+
-  labs(title="Hex Bin Grid",
-       subtitle="El Paso, Texas",
-       caption="Total ridership for the year 2022 will be aggregated into each hexbin as the dependent variable,\nin addition to our predictive features.")+
-  mapTheme2
-
-ggplot()+
-  geom_sf(data=el_paso, fill='grey')+
-  geom_sf(data=final_hex, aes(fill=q5(ridership)), alpha=0.7, color=NA)+
-  scale_fill_manual(values = palette5cont,
-                    labels=qBr(ridership),
-                    name="Ridership\nQuintiles")+
-  labs(title="Hex Bin Grid",
-       subtitle="El Paso, Texas",
-       caption="Total ridership for the year 2022 will be aggregated into each hexbin as the dependent variable,\nin addition to our predictive features.")+
-  mapTheme2
-
-ggplot()+ 
-  geom_sf(data = el_paso, fill="lightgrey", color="black", size=80)+
-  geom_sf(data = final_hex, aes(fill = q5(ridership)), color=NA)+
-  scale_fill_manual(values = palette5cont, 
-                     labels = qBr(final_hex, "ridership"),
-                    name="Ridership\nQuintiles") +
-  labs(title="Total Local Ridership by Census Tract",
-       subtitle="El Paso, TX (2022)")+
-  mapTheme
-
-# Cluster the ridership data into 5 groups
-final_hex$ridership_clusters <- kmeans(final_hex$ridership, centers = 5)$cluster
-
-# Create the ggplot
-ggplot() +
-  geom_sf(data = el_paso, fill = "lightgrey", color = "black", size = 0.2) +
-  geom_sf(data = final_hex, aes(fill = ridership_clusters), color = NA) +
-  scale_fill_discrete(values = palette5cont,
-                     name = "Ridership\nClusters",
-                     labels = c("Cluster 1", "Cluster 2", "Cluster 3", "Cluster 4", "Cluster 5")) +
-  labs(title = "Total Local Ridership by Census Tract",
-       subtitle = "El Paso, TX (2022)") +
-  mapTheme
-
-
-
+  mapTheme3
 ```
 
+Most of our hexes have zero or close to zero observations in terms of ridership, so we logarithmically transform the ridership below, showing it has a relatively normal distribution.
 
+```{r log transform,  warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
+ggplot(hex_final, aes(x = log(ridership))) +
+  geom_histogram(color = "black", fill = palette1) +
+  labs(title = "Logarithmic Distribution of Ridership per Hex",
+       subtitle = "El Paso, TX",
+       x = "log(ridership)",
+       y = "Count")+
+  plotTheme
+```
 
 ## American Community Survey (2019)
 
-We utilized the census API to gather a range of demographic information, socioeconomic status, household income and occupancy rates, education, and travel patterns, among other variables. This data will provide valuable insights into the equity and accessibility implications of our model, as marginalized populations often heavily rely on public transit but may face barriers in utilizing buses efficiently. We aimed to explore the spatial distribution of these demographics to identify any potential spatial relationships and understand their potential impact on bus transit demand. Below, we showcase some interesting maps depicting census features. 
-
->EDIT<
+We utilized the census API to gather a range of demographic information, socioeconomic status, household income and occupancy rates, education, and travel pattern characteristics, among other variables. This data will provide valuable insights into the equity and accessibility implications of our model, as marginalized populations often heavily rely on public transit but may face barriers in utilizing buses efficiently. We aimed to explore the spatial distribution of these demographics to identify any potential spatial relationships and understand their potential impact on bus transit demand.
 
 ```{r census vars, warning=FALSE, message=FALSE, results=FALSE}
 censusvarsEP <- c(
@@ -1018,350 +970,78 @@ acs_correlations <- left_join(agg_data_st, acs_ep_hex, by="GEOID")
 Four maps of the White, Hispanic/Latino, Black, and Asian populations are below. It appears that there is racial segregation, as census tracts with the greatest density of Black residents seem to have decreased amount of White and Latino residents. There also is a strip along the Rio Grande in the southeastern part of the city where there is an incredibly high density of Hispanic/Latino residents. A high density of Asian residents seem to live just northwest of downtown.
 
 ```{r race distribution maps, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
-grid.arrange(ncol=2,
-             ggplot()+
-               geom_sf(data=acs_ep_plots, aes(fill=whitePopPct), color="black")+
-               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
-               labs(title="% White population",
-                    caption="Data: ACS, 2019")+
-               mapTheme,
-             ggplot()+
-               geom_sf(data=acs_ep_plots, aes(fill=hlPopPct), color="black")+
-               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
-               labs(title="% Hispanic/Latino population",
-                    caption="Data: ACS, 2019")+
-               mapTheme,
-             ggplot()+
-               geom_sf(data=acs_ep_plots, aes(fill=blackPopPct), color="black")+
-               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
-               labs(title="% Black population",
-                    caption="Data: ACS, 2019")+
-               mapTheme,
-             ggplot()+
-               geom_sf(data=acs_ep_plots, aes(fill=asianPopPct), color="black")+
-               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
-               labs(title="% Asian population",
-                    caption="Data: ACS, 2019")+
-               mapTheme,
-             top="Racial Distribution in El Paso, TX"
-)
-```
-
-```{r race distribution hex, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 grid.arrange(ncol=3,
              ggplot()+
-               geom_sf(data=final_hex4, aes(fill=totalPop), color=NA)+
-               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per \nsq km")+
-               labs(title="Total Population")+
+               geom_sf(data=hex_final, aes(fill=totalPop), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per\nsq km")+
+               labs(title="Total population")+
                mapTheme3,
              ggplot()+
-               geom_sf(data=final_hex4, aes(fill=whitePop), color=NA)+
-               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per \nsq km")+
-               labs(title="White Population")+
+               geom_sf(data=hex_final, aes(fill=whitePop), color=NA)+
+               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per\nsq km")+
+               labs(title="White population")+
                mapTheme3,
              ggplot()+
-               geom_sf(data=final_hex4, aes(fill=hlPop), color=NA)+
+               geom_sf(data=hex_final, aes(fill=blackPop), color=NA)+
                scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per \nsq km")+
-               labs(title="Hispanic/Latino Population")+
+               labs(title="Black population")+
                mapTheme3,
              ggplot()+
-               geom_sf(data=final_hex4, aes(fill=blackPop), color=NA)+
+               geom_sf(data=hex_final, aes(fill=asianPop), color=NA)+
                scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per \nsq km")+
-               labs(title="Black Population")+
+               labs(title="Asian population")+
                mapTheme3,
              ggplot()+
-               geom_sf(data=final_hex4, aes(fill=asianPop), color=NA)+
+               geom_sf(data=hex_final, aes(fill=hlPop), color=NA)+
                scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per \nsq km")+
-               labs(title="Asian Population")+
+               labs(title="Hispanic/Latino population")+
                mapTheme3,
              ggplot()+
-               geom_sf(data=final_hex4, aes(fill=(nhPop+aiPop+otherRacePop+twoPlusRacePop)), color=NA)+
+               geom_sf(data=hex_final, aes(fill=nhPop+otherRacePop+aiPop+twoPlusRacePop), color=NA)+
                scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="per \nsq km")+
-               labs(title="Other Race Population")+
+               labs(title="Other Race population")+
                mapTheme3,
-             top="Racial Distribution in El Paso, TX (Total Population per square mile)",
-             bottom="Data: ACS, 2019"
+             top="Racial Distribution in El Paso, TX", bottom="Data: ACS, 2019"
 )
 ```
-
 
 ### Household Vacancy
 
 Vacant households may contribute to ridership demand; if units are unoccupied, there is a decreased density of residents and thus less people who may need to utilize buses. There seems to be a relatively random spatial pattern on percentage of vacant housing units. It appears more densified areas such as downtown see higher rates of vacancy.
 
-```{r vacant HU pct, warning=FALSE, message=FALSE, results=FALSE}
+```{r vacant HU pct, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 ggplot()+
-  geom_sf(data=acs_ep_plots, aes(fill=q5(vacantHUPct)), color="black")+
+  geom_sf(data=hex_final, aes(fill=q5(vacantHUPct)), color=NA)+
   scale_fill_manual(values = palette5cont, 
-                    labels = (qBr(acs_ep_plots, "vacantHUPct")),
+                    labels = c("Bottom 20%", "20 to 40%", "40 to 60%", "60 to 80%", "Top 20%"),
                     name="% Vacancy\nQuintiles") +
   labs(title="Vacant Housing Units",
        subtitle="El Paso, TX",
        caption="Data: ACS, 2019")+
-  mapTheme
+  mapTheme3
 ```
 
 ### Median Household Income
 
 Household income is a significant factor in transit demand, particularly for lower income households who may rely more heavily on public transportation due to the cost of car ownership. Interestingly, there appears to be a spatial clustering of Hispanic/Latino residents in census tracts with the lowest median household income. On the other hand, census tracts around the University of Texas-El Paso in the northwest part of the city seem to have the highest median household income. These patterns of median household income show some rigidity, with noticeable clustering of income distribution within certain areas.
 
-```{r cen plot3, warning=FALSE, message=FALSE, results=FALSE}
+```{r cen plot3, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 ggplot()+
-  geom_sf(data=acs_ep, aes(fill=q5(medHHInc)), color="black")+
+  geom_sf(data=hex_final, aes(fill=q5(medHHInc)), color=NA)+
   scale_fill_manual(values = palette5cont, 
-                    labels = (qBr(acs_ep_plots, "medHHInc")),
+                    labels = (qBr(hex_final, "medHHInc")),
                     name="Income by\nQuintiles") +
   labs(title="Median Household Income",
-       subtitle="El Paso, TX (2020)",
-       caption="Data: ACS, 2020")+
-  mapTheme
+       subtitle="El Paso, TX",
+       caption="Data: ACS, 2019")+
+  mapTheme3
 ```
-
-```{r}
-ggplot()+
-               geom_sf(data=hex6cleaned, aes(fill=(disability)), color=NA)+
-               scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Total")+
-               labs(title="Disabled Population", caption="Data: ACS, 2019")+
-               mapTheme3
-```
-
-```{r}
-grid.arrange(ncol=2,
-ggplot()+
-  geom_sf(data=final_hex4, aes(fill=(jobsPopBalance)), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Score",
-                         breaks=c(0, 0.25, 0.5, 0.75, 1))+
-  labs(title="Jobs to Population Balance")+
-  mapTheme3,
-ggplot()+
-  geom_sf(data=final_hex4, aes(fill=(employmentHHMix)), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Score",
-                         breaks=c(0, 0.25, 0.5, 0.75, 1))+
-  labs(title="Employment Household Mix")+
-  mapTheme3,
-bottom="Data: NWI, 2019"
-)
-```
-
-```{r, fig.width=12}
-grid.arrange(ncol=3,
-ggplot()+
-  geom_sf(data=final_hex4, aes(fill=(major_road.nn1)), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Score", breaks=c(0, 1))+
-  labs(title="Distance to Nearest Major Road")+
-  mapTheme3,
-ggplot()+
-  geom_sf(data=final_hex4, aes(fill=(parks.nn1)), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Score", breaks=c(0, 1))+
-  labs(title="Distance to Nearest Park")+
-  mapTheme3,
-ggplot()+
-  geom_sf(data=final_hex4, aes(fill=(department_stores.nn1)), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Score", breaks=c(0, 1))+
-  labs(title="Distance to Nearest Department Store")+
-  mapTheme3,
-top="Distance to Amenity Features (first nearest neighbor)", bottom="Data: Open Data El Paso, Open Street Map"
-)
-```
-
-```{r fig.width=12}
-grid.arrange(ncol=2,
-ggplot()+
-  geom_sf(data=final_hex4, aes(fill=(stops_in_hex)), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Total")+
-  labs(title="Number of Bus Stops")+
-  mapTheme3+theme(legend.position = "bottom"),
-ggplot()+
-  geom_sf(data=final_hex4, aes(fill=(bays_in_hex)), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Total", )+
-  labs(title="Number of Transfer Bay")+
-  mapTheme3+theme(legend.position = "bottom")
-)
-
-grid.arrange(ncol=2,
-ggplot(final_hex4, aes(x = stops_in_hex, y = ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Bus Stops per hex", y = "Total Ridership", 
-       title = "Bus Stops per hex") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(ridership ~ stops_in_hex, data = final_hex4))$r.squared, 3)))+
-  plotTheme2,
-ggplot(final_hex4, aes(x = bays_in_hex, y = ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Transfer Bay Stops per hex", y = "", 
-       title = "Transfer Bay Stops per hex") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(ridership ~ bays_in_hex, data = final_hex4))$r.squared, 3)))+plotTheme2
-)
-```
-
-
-```{r, fig.width=12}
-grid.arrange(ncol=2,
-ggplot(final_hex4, aes(x = stops_in_hex, y = ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Bus Stops per hex", y = "Total Ridership", 
-       title = "Bus Stops per hex") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(ridership ~ stops_in_hex, data = final_hex4))$r.squared, 3)))+
-  plotTheme2,
-ggplot(final_hex4, aes(x = bays_in_hex, y = ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Transfer Bay Stops per hex", y = "", 
-       title = "Transfer Bay Stops per hex") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(ridership ~ bays_in_hex, data = final_hex4))$r.squared, 3)))+plotTheme2
-)
-```
-
-
-## Scatterplots
-
->DESCRIPTION<
-
-```{r acs scatters, fig.height=12, fig.width=18, warning=FALSE, message=FALSE, results=FALSE}
-acs_scatters <- acs_correlations %>% 
-  dplyr::select(c("total_ridership", "totalPop", "hlPop", "whitePop", "blackPop", "hlPop", "aiPop", "asianPop", "nhPop", "otherRacePop", "twoPlusRacePop", "medHHInc", "totalHU", "occupiedHU", "grossRentPerInc", "vehiclesAvailable", "disability", "lessThanHS", "highSchool", "associatesDeg", "bachelorDeg", "professionalDeg"))
-
-ind_vars_acs <- c("totalPop", "hlPop", "whitePop", "blackPop", "hlPop", "aiPop", "asianPop", "nhPop", "otherRacePop", "twoPlusRacePop", "medHHInc", "totalHU", "occupiedHU", "grossRentPerInc", "vehiclesAvailable", "disability", "lessThanHS", "highSchool", "associatesDeg", "bachelorDeg", "professionalDeg")
-
-grid.arrange(ncol=5, top="ACS Variables vs. Total Ridership",
-ggplot(acs_scatters, aes(x = totalPop, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Total Population", y = "Total Ridership", 
-       title = "Total Population") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ totalPop, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = whitePop, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "White Population", y = "Total Ridership", 
-       title = "White Population") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ whitePop, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = hlPop, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Hispanic/Latino Population", y = "Total Ridership", 
-       title = "Hispanic/Latino Population") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ hlPop, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = blackPop, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Black Population", y = "Total Ridership", 
-       title = "Black Population") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ blackPop, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = asianPop, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Asian Population", y = "Total Ridership", 
-       title = "Asian Population") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ asianPop, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = medHHInc, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Median Household Income", y = "Total Ridership", 
-       title = "Median Household Income") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ medHHInc, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = occupiedHU, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Occupied Housing Units", y = "Total Ridership", 
-       title = "Occupied Housing Units") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ occupiedHU, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = grossRentPerInc, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Gross Rent per Income", y = "Total Ridership", 
-       title = "Gross Rent per Income") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ grossRentPerInc, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = vehiclesAvailable, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Vehicles per sq km", y = "Total Ridership", 
-       title = "Vehicles per sq km") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ vehiclesAvailable, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = disability, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Disabled Population", y = "Total Ridership", 
-       title = "Disabled Population") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ disability, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = lessThanHS, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Less than HS", y = "Total Ridership", 
-       title = "Less than HS") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ lessThanHS, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = highSchool, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "High School", y = "Total Ridership", 
-       title = "High School") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ highSchool, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = associatesDeg, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Associates Degree", y = "Total Ridership", 
-       title = "Associates Degree") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ associatesDeg, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = bachelorDeg, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Bachelor Degree", y = "Total Ridership", 
-       title = "Bachelor Degree") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ bachelorDeg, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2,
-ggplot(acs_scatters, aes(x = professionalDeg, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Prof. Degree", y = "Total Ridership", 
-       title = "Prof. Degree") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ professionalDeg, data = acs_scatters))$r.squared, 3)))+
-  plotTheme2
-)
-```
-
-####
-CODE TO JOIN ACS TO HEXES
-####
 
 ## National Walkability Index (2019)
 
 A major assumption of our model is that land use patterns and urban design play a huge role in people's accessibility and desire to use transit, or their dependency on specific modes of transportation given inaccessibility of other modes. The National Walkability Index is a geographic resource that scores every block group in the U.S. on its relative walkability. A variety of factors explain walkability, including sidewalk availability, infrastructural assessment, street connectivity, amenity proximity, and urban form conducive to walkable neighborhoods.
 
-From the Environmental Protection Agency, we derived the National Walkability Index (NWI) scores for 2019. This included a variety of indicators, including vehicle ownership, density of employment, jobs, and households, intersection and transit stop density, and regional and destination accessibility.
+From the Environmental Protection Agency, we derived the National Walkability Index (NWI) scores for 2019 at the block group level. This included a variety of indicators, including vehicle ownership, density of employment, jobs, and households, intersection and transit stop density, and regional and destination accessibility.
 
 ```{r nwi data cleaning, warning=FALSE, message=FALSE, results=FALSE}
 nwi <- read_csv(paste(data_folder, "/nwi2019.csv", sep = '')) %>%
@@ -1440,210 +1120,113 @@ The nearest transit accessibility score is calculated as the distance (in meters
 
 For the purpose of visualization, census blocks that do not have a transit stop within them were removed from the data, as they were assigned a value of -99999. From the remaining blocks, the histogram shows a unimodal distribution with a peak around 400 meters, indicating that a transit stop is within 0.25 miles from the population-weighted centroid for the majority of census block groups. While this generally aligns with the metric of transit accessibility, which is often measured as a transit stop within 0.25 or 0.5 miles of home, it is challenging to determine if this is the most effective measure for transit accessibility given it does not look at data at the household level.
 
->NEEDS EDITS<
+> NEEDS EDITS\<
 
 ```{r nearest transit, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 grid.arrange(ncol=2,
-ggplot(nwi_bg_st, aes(x = nearestTransit)) +
+ggplot(hex_final, aes(x = nearestTransit)) +
   geom_histogram(color = "black", fill = palette1) +
   labs(title = "Nearest Transit Stop Histogram",
-       subtitle = "El Paso, TX (Census Blocks)",
+       subtitle = "El Paso, TX (Hexbins)",
        x = "Distance (meters)",
        y = "Count",
        caption = "Data: National Walkability Index (2019)")+
   plotTheme,
 ggplot()+
-  geom_sf(data=el_paso, fill="lightgrey", color="black")+
-  geom_sf(data=nwi_bg, aes(fill=q5(nearestTransit)), color="black")+
+  geom_sf(data=hex_final, aes(fill=q5(nearestTransit)), color=NA)+
   scale_fill_manual(values = palette5cont, 
-                    labels = (qBr(nwi_bg, "nearestTransit")),
+                    labels = (qBr(hex_final, "nearestTransit")),
                     name="Distance (meters)") +
  # scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance\n(meters)")+
   labs(title="Nearest Transit Stop Map",
-       subtitle="El Paso, TX (Census Blocks)",
-       caption="Areas in grey have no transit stops in block group")+
-  mapTheme2+
+       subtitle="El Paso, TX (Hexbins)")+
+  mapTheme3+
   theme(legend.position = "bottom")
 )
 ```
 
 ### Destination Accessibility
 
-The destination accessibility metric is measured as jobs within 45-minute transit commute, accounting for factors such as distance decay (accessibility of jobs may decrease with increasing distance from a particular location) and time it takes to walk to a transit stop. General Transit Feed Specification (GTFS) data was used in tandem to calculate this metric. 
+The destination accessibility metric is measured as jobs within 45-minute transit commute, accounting for factors such as distance decay (accessibility of jobs may decrease with increasing distance from a particular location) and time it takes to walk to a transit stop. General Transit Feed Specification (GTFS) data was used in tandem to calculate this metric.
 
 We can see where there is increased density of jobs (e.g. downtown, UTEP), the metric is higher.
 
->EDIT<
-
 ```{r destination accessibility, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 grid.arrange(ncol=2,
-ggplot(nwi_bg_st, aes(x = destinationAccessibility)) +
+ggplot(hex_final, aes(x = destinationAccessibility)) +
   geom_histogram(color = "black", fill = palette1) +
-  labs(title = "Destination Accessibility Histogram",
-       subtitle = "El Paso, TX (Census Blocks)",
-       x = "Density Score",
+  labs(title = "Destination Accessibility Stop Histogram",
+       subtitle = "El Paso, TX (Hexbins)",
+       x = "Score",
        y = "Count",
        caption = "Data: National Walkability Index (2019)")+
   plotTheme,
 ggplot()+
-  geom_sf(data=el_paso, fill="lightgrey", color="black")+
-  geom_sf(data=nwi_bg, aes(fill=q5(destinationAccessibility)), color="black")+
-  #scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Density\nScore")+
+  geom_sf(data=hex_final, aes(fill=q5(destinationAccessibility)), color=NA)+
   scale_fill_manual(values = palette5cont, 
-                    labels = (qBr(nwi_bg, "destinationAccessibility")),
-                    name="Density Score") +
-  labs(title="Destination Accessibility Map",
-       subtitle="El Paso, TX (Census Blocks)",
-       caption="Areas in grey have no transit stops in block group")+
-    theme(legend.position = "bottom")+
-  mapTheme2
+                    labels = (qBr(hex_final, "destinationAccessibility")),
+                    name="Score") +
+ # scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance\n(meters)")+
+  labs(title="Destination Accessibility Stop Map",
+       subtitle="El Paso, TX (Hexbins)")+
+  mapTheme3+
+  theme(legend.position = "bottom")
 )
 ```
 
 ### Intersection Density (D3B)
 
->NEEDS SOMETHING<
+> NEEDS SOMETHING\<
 
 ```{r intersection density dist, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
+
+
 grid.arrange(ncol=2,
-ggplot(nwi_bg_st, aes(x = intersectionDensity)) +
+ggplot(hex_final, aes(x = intersectionDensity)) +
   geom_histogram(color = "black", fill = palette1) +
-  labs(title = "Intersection Density Histogram",
-       subtitle = "El Paso, TX (Census Blocks)",
+  labs(title = "Intersection Density Stop Histogram",
+       subtitle = "El Paso, TX (Hexbins)",
        x = "Score",
-       y = "Count")+
+       y = "Count",
+       caption = "Data: National Walkability Index (2019)")+
   plotTheme,
 ggplot()+
-  geom_sf(data=nwi_bg, aes(fill=q5(intersectionDensity)), color="black")+
-  #scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Density\nScore")+
+  geom_sf(data=hex_final, aes(fill=q5(intersectionDensity)), color=NA)+
   scale_fill_manual(values = palette5cont, 
-                    labels = (qBr(nwi_bg, "intersectionDensity")),
-                    name="Density Score"
-                    ) +
-  labs(title="Intersection Density Map",
-       subtitle="El Paso, TX (Census Blocks)")+
-  mapTheme2+
+                    labels = (qBr(hex_final, "intersectionDensity")),
+                    name="Score") +
+ # scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance\n(meters)")+
+  labs(title="Intersection Density Stop Map",
+       subtitle="El Paso, TX (Hexbins)")+
+  mapTheme3+
   theme(legend.position = "bottom")
 )
 ```
 
-### Scatterplots
+### Employment Diversity to Occupied Housing
 
-```{r nwi scatters, fig.width=12, fig.height=8, warning=FALSE, message=FALSE, results=FALSE}
-local1 <- df[df$type %in% "Local", ]
-
-local_agg <- local1 %>%
-  group_by(RT, TP, longitude, latitude) %>%
-  summarize(total_ons = sum(Ons),
-            total_offs = sum(Offs)) %>%
-  mutate(total_ridership = (total_ons + total_offs)) %>%
-  dplyr::select(-c("total_ons", "total_offs"))
-
-local_agg <- local_agg %>%
-  dplyr::select(c("geometry", "total_ridership")) %>%
-  st_transform(crs=4269)
-
-ep_blocks <- ep_blocks %>% # EP TRACTS ARE NOW CRS 4269
-  st_transform(crs=4269)
-
-local_agg_blocks <- st_join(local_agg, ep_blocks, join = st_within)
-
-local_agg_blocks <- local_agg_blocks %>%
-  group_by(GEOID) %>%
-  summarise(total_ridership = sum(total_ridership))
-
-local_agg_blocks <- local_agg_blocks %>%
-  st_drop_geometry()
-
-agg_data3 <- left_join(local_agg_blocks, ep_tracts, by = "GEOID") %>%
-  dplyr::select(c("total_ridership", "GEOID"))
-
-nwi_correlations <- merge(agg_data3, nwi_bg_st, on = "GEOID")
-nwi_correlations_log <- nwi_correlations[nwi_correlations$nearestTransit != -1,]
-nwi_correlations_log[nwi_correlations_log == 0] <- as.numeric(nwi_correlations_log[nwi_correlations_log == 0 + 0.1])
- 
-
-
-
-grid.arrange(ncol=4, top="NWI Variables vs. Total Ridership",
-ggplot(nwi_correlations, aes(x = pct0Car, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "% 0 Car Households", y = "Total Ridership", 
-       title = "") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ pct0Car, data = nwi_correlations))$r.squared, 3)))+
-  plotTheme2,
-
-ggplot(nwi_correlations, aes(x = pct1Car, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "% 1 Car Households", y = "Total Ridership", 
-       title = "") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ pct1Car, data = nwi_correlations))$r.squared, 3)))+
-  plotTheme2,
-
-ggplot(nwi_correlations, aes(x = pctLowWage, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "% Low Wage Workers", y = "Total Ridership", 
-       title = "") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ pctLowWage, data = nwi_correlations))$r.squared, 3)))+
-  plotTheme2,
-
-ggplot(nwi_correlations, aes(x = employmentDensity, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Employment Density", y = "Total Ridership", 
-       title = "") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ employmentDensity, data = nwi_correlations))$r.squared, 3)))+
-  plotTheme2,
-
-ggplot(nwi_correlations, aes(x = employmentHHMix, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Employment Household Mix", y = "Total Ridership", 
-       title = "") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ employmentHHMix, data = nwi_correlations))$r.squared, 3)))+
-  plotTheme2,
-
-ggplot(nwi_correlations, aes(x = nearestTransit, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Nearest Transit Stop", y = "Total Ridership", 
-       title = "") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ nearestTransit, data = nwi_correlations))$r.squared, 3)))+
-  plotTheme2,
-
-ggplot(nwi_correlations, aes(x = jobAccessibility, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Job Accessibility", y = "Total Ridership", 
-       title = "") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ jobAccessibility, data = nwi_correlations))$r.squared, 3)))+
-  plotTheme2,
-
-ggplot(nwi_correlations, aes(x = destinationAccessibility, y = total_ridership)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  labs(x = "Destination Accessibility", y = "Total Ridership", 
-       title = "") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R^2 = ", round(summary(lm(total_ridership ~ destinationAccessibility, data = nwi_correlations))$r.squared, 3)))+
-  plotTheme2
+```{r employment HH mix, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
+grid.arrange(ncol=2,
+ggplot(hex_final, aes(x = employmentHHMix)) +
+  geom_histogram(color = "black", fill = palette1) +
+  labs(title = "Emplotment/HH Mix Histogram",
+       subtitle = "El Paso, TX (Hexbins)",
+       x = "Score",
+       y = "Count",
+       caption = "Data: National Walkability Index (2019)")+
+  plotTheme,
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=q5(employmentHHMix)), color=NA)+
+  scale_fill_manual(values = palette5cont, 
+                    labels = (qBr(hex_final, "employmentHHMix")),
+                    name="Score") +
+ # scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance\n(meters)")+
+  labs(title="Emplotment/HH Mix Map",
+       subtitle="El Paso, TX (Hexbins)")+
+  mapTheme3+
+  theme(legend.position = "bottom")
 )
-
 ```
-
-####
-HEX CODE
-####
 
 ## Longitudinal Employment-Household Data (LEHD)
 
@@ -1761,47 +1344,47 @@ lhed_ep_st <- lehd_ep %>%
 
 ### Income Distribution of Jobs - Monthly Income
 
-We calculated the percentage of each monthly income bracket of the census tracts - which in LEHD are divided as making under $1250 per month, between $1251 and $3333 per month, or over $3334 per month.
+We calculated the percentage of each monthly income bracket of the census tracts - which in LEHD are divided as making under \$1250 per month, between \$1251 and \$3333 per month, or over \$3334 per month.
 
 ```{r income dist, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 grid.arrange(ncol=3,
 ggplot()+
-  geom_sf(data=lehd_ep, aes(fill=income1250LessPct*100), color="black")+
+  geom_sf(data=hex_final, aes(fill=income1250LessPct*100), color=NA)+
   scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
   labs(title="Under $1250",
        caption="Data: LEHD, 2019")+
-  mapTheme+
+  mapTheme3+
   theme(legend.position = 'bottom'),
 ggplot()+
-  geom_sf(data=lehd_ep, aes(fill=income1251to3333Pct*100), color="black")+
+  geom_sf(data=hex_final, aes(fill=income1251to3333Pct*100), color=NA)+
   scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
   labs(title="Between $1251 to $3333",
        caption="Data: LEHD, 2019")+
-  mapTheme+
+  mapTheme3+
   theme(legend.position = 'bottom'),
 ggplot()+
-  geom_sf(data=lehd_ep, aes(fill=income3333OverPct*100), color="black")+
+  geom_sf(data=hex_final, aes(fill=income3333OverPct*100), color=NA)+
   scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
   labs(title="Over $3334",
        caption="Data: LEHD, 2019")+
-  mapTheme+
+  mapTheme3+
   theme(legend.position = 'bottom')
 )
 ```
 
->MORE INFO<
+> MORE INFO\<
 
 ```{r bar chart income dist,warning=FALSE, message=FALSE, results=FALSE, fig.height=8, fig.width=12}
-epworkincome <- lhed_ep_st[, c("GEOID", "income1250LessPct", "income1251to3333Pct", "income3333OverPct")]
+epworkincome <- hex_final[, c("uniqueID", "income1250LessPct", "income1251to3333Pct", "income3333OverPct")] %>% st_drop_geometry()
 
 epworktidy <- epworkincome %>%
-  gather(key = "IncomeLevel", value = "Income", -GEOID)
+  gather(key = "IncomeLevel", value = "Income", -uniqueID)
 
-ggplot(epworktidy, aes(x = Income, y = GEOID, fill = IncomeLevel)) +
+ggplot(epworktidy, aes(x = Income, y = uniqueID, fill = IncomeLevel)) +
   geom_bar(stat = "identity", position = "stack", width=2) +
   scale_fill_manual(values=c(palette5cont[5:3]),
                     labels=c("< 1250", "Between 1251 and 3334", " > 3334"))+
-  labs(y = "Census Tract", x = "Income", fill = "Monthly Income ($)", title = "Job Income Breakdown at Census Tract Level",
+  labs(y = "Hex", x = "Income", fill = "Monthly Income ($)", title = "Job Income Breakdown at Hexbin Level",
        subtitle = "El Paso, TX",
        caption = "Data: LEHD, 2019") +
   plotTheme+
@@ -1810,56 +1393,37 @@ ggplot(epworktidy, aes(x = Income, y = GEOID, fill = IncomeLevel)) +
 
 ### Age Distribution of Jobs
 
->DESCRIPTION<
+> DESCRIPTION\<
 
 ```{r age dist, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 grid.arrange(ncol=3, top="Age Bracket Distribution of Jobs",
 ggplot()+
-  geom_sf(data=lehd_ep, aes(fill=(age29youngerPct*100)), color="black")+
+  geom_sf(data=hex_final, aes(fill=(age29youngerPct*100)), color=NA)+
   scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
   labs(title="Age < 29",
        caption="Data: LEHD, 2019")+
-  mapTheme+
+  mapTheme3+
   theme(legend.position = 'bottom'),
 ggplot()+
-  geom_sf(data=lehd_ep, aes(fill=(age30to54Pct*100)), color="black")+
+  geom_sf(data=hex_final, aes(fill=(age30to54Pct*100)), color=NA)+
   scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
   labs(title="Age 30 to 54",
        caption="Data: LEHD, 2019")+
-  mapTheme+
+  mapTheme3+
   theme(legend.position = 'bottom'),
 ggplot()+
-  geom_sf(data=lehd_ep, aes(fill=(age55olderPct*100)), color="black")+
+  geom_sf(data=hex_final, aes(fill=(age55olderPct*100)), color=NA)+
   scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
   labs(title="Age 55+",
        caption="Data: LEHD, 2019")+
-  mapTheme+
+  mapTheme3+
   theme(legend.position = 'bottom')
 )
 ```
 
->INFO<
-
-```{r bar chart age dist,warning=FALSE, message=FALSE, results=FALSE, fig.height=8, fig.width=12}
-epworkage <- lhed_ep_st[, c("GEOID", "age29youngerPct", "age30to54Pct", "age55olderPct")]
-
-epworktidy2 <- epworkage %>%
-  gather(key = "AgeBracket", value = "Age", -GEOID)
-
-ggplot(epworktidy2, aes(x = Age, y = GEOID, fill = AgeBracket)) +
-  geom_bar(stat = "identity", position = "stack", width=2) +
-  scale_fill_manual(values=c(palette5cont[5:3]),
-                    labels=c("< 1250", "Between 1251 and 3334", " > 3334"))+
-  labs(y = "Census Tract", x = "Income", fill = "Monthly Income ($)", title = "Job Income Breakdown at Census Tract Level",
-       subtitle = "El Paso, TX",
-       caption = "Data: LEHD, 2019") +
-  plotTheme+
-  theme(axis.text.y = element_blank(), legend.position = "bottom")
-```
-
 ### Job Types
 
->INFO< 
+> INFO\<
 
 ```{r jobs_table}
 epworkjobs <- lehd_ep[, c("GEOID",
@@ -1888,19 +1452,13 @@ library(DT)
 datatable(epworkjobs)
 ```
 
-###
-JOIN TO HEX
-###
-
 ## Open Data El Paso
 
-Open Data El Paso is the city's open-source data platform. We pulled several demographic and built environment features to engineer into our model that explain the impacts of transit demand. 
->INFO< 
+Open Data El Paso is the city's open-source data platform. We pulled several demographic and built environment features to engineer into our model that explain the impacts of transit demand. Particularly, we calculated 1st, 3rd, and 5th nearest neighbor distances for each of our features.
 
 ### Schools
 
-Distance to schools can serve as a potentially strong indicator of transit demand given high concentration of potential riders (students, teachers, staff), consistent travel patterns (circuitous), and 
->INFO< 
+Distance to schools can serve as a potentially strong indicator of transit demand given high concentration of potential riders (students, teachers, staff), consistent travel patterns (circuitous), and \>INFO\<
 
 ```{r schools data cleaning, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 schools <- schools %>%
@@ -1908,26 +1466,36 @@ schools <- schools %>%
   dplyr::filter(TYPE_ != "ADMIN") %>%
   dplyr::filter(TYPE_ != "FACILITIES")
 
-ggplot() +
-  geom_sf(data = el_paso, fill = "grey", color = NA) +
-  geom_sf(data = schools, aes(color = TYPE_), size = 2, alpha=0.85) +
-  scale_color_manual(values = palette6, name = "Type") +
-  guides(color = guide_legend(override.aes = list(shape = 22, size = 5, fill=palette6))) +
-  labs(title="Schools",
-       subtitle="El Paso Independent School District",
-       caption="Source: Open Data El Paso, 2023")+
-  mapTheme
+# ggplot() +
+#   geom_sf(data = el_paso, fill = "grey", color = NA) +
+#   geom_sf(data = final_hex, aes(color = TYPE_), size = 2, alpha=0.85) +
+#   scale_color_manual(values = palette6, name = "Type") +
+#   guides(color = guide_legend(override.aes = list(shape = 22, size = 5, fill=palette6))) +
+#   labs(title="Schools",
+#        subtitle="El Paso Independent School District",
+#        caption="Source: Open Data El Paso, 2023")+
+#   mapTheme
+
+
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=(schools.nn1)), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
+  labs(title="Distance to Nearest School",
+       caption="Data: Open Data El Paso")+
+  mapTheme3+
+  theme(legend.position = 'bottom')
+
 ```
 
 ### Parks
 
->INFO< 
+> INFO\<
 
 ```{r parks data, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 parks <- parks %>%
   dplyr::filter(CATEGORY %in% c("City Park", "Open Space", "Trail", "Trailhead"))
 
-ggplot() +
+# ggplot() +
   geom_sf(data = el_paso, fill = "grey", color = NA) +
   geom_sf(data = parks, aes(fill = CATEGORY, color = CATEGORY), size = 2, alpha=0.85) +
   scale_fill_manual(values = palette6[1:4], name = "Type") +
@@ -1941,7 +1509,7 @@ ggplot() +
 
 ### Road Infrastructure
 
->INFO< 
+> INFO\<
 
 ```{r road classification and count roads, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 road_class <- c(
@@ -1980,7 +1548,7 @@ ggplot(class_count_df, aes(x = CLASS, y = Count, fill = CLASS)) +
   plotTheme
 ```
 
->INFO< 
+> INFO\<
 
 ```{r major roads map, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 major <- roads %>%
@@ -2032,13 +1600,12 @@ ggplot()+
   mapTheme
 ```
 
-
 ## Open Street Map
 
-Open Street Map (OSM) is an open-source, collaborative, free geographic database in which users can aggregate features related to different environmental features of a place, such as buildings, land uses, and roadways. We hypothesized that distance to a variety of built environment features may be predictive of bus ridership. We chose features from keys "amenity" and "shop" listed below: 
+Open Street Map (OSM) is an open-source, collaborative, free geographic database in which users can aggregate features related to different environmental features of a place, such as buildings, land uses, and roadways. We hypothesized that distance to a variety of built environment features may be predictive of bus ridership. We chose features from keys "amenity" and "shop" listed below:
 
-- **Amenities:** hospital, clinic, doctors, pharmacy, restaurant, cafe, bar, place_of_worship, arts_centre, cinema, theatre
-- **Shops:** department_store, general, supermarket, mall
+-   **Amenities:** hospital, clinic, doctors, pharmacy, restaurant, cafe, bar, place_of_worship, arts_centre, cinema, theatre
+-   **Shops:** department_store, general, supermarket, mall
 
 One thing to note about OSM is that since it is a volunteer-based platform, it is not guaranteed every feature that matches each value may yet be aggregated into Open Street Map; however, we included all of these features given there seemed to be ample amount of points for each that still explained the spatial distribution of features in El Paso.
 
@@ -2252,8 +1819,7 @@ osm_points <- rbind(
 
 ### Feature Counts
 
->INFO<
-
+> INFO\<
 
 ```{r osm plot 1, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 osm_points_st <- osm_points %>%
@@ -2271,9 +1837,7 @@ ggplot(osm_points_st, aes(y = type)) +
 
 ### Feature Distributions
 
-Below is a point-level distribution of each feature, separated into four maps with shared characteristics. 
->INFO<
-
+Below is a point-level distribution of each feature, separated into four maps with shared characteristics. \>INFO\<
 
 ```{r different osm plots, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 health <- rbind(hospital_points, clinic_points, pharmacy_points)
@@ -2311,7 +1875,7 @@ ncol=2)
 
 ## Spatial Effect - Transit Bays
 
->INFO<
+> INFO\<
 
 ```{r spatial effects, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 bays <- local_transit_bays %>%
@@ -2494,4 +2058,46 @@ vars_net <-
       major_road.nn5 =
         nn_function(st_c(st_coid(vars_net)), st_c(st_coid(major_hex)),5)
     )
+```
 
+# Modeling
+
+```{r}
+ggplot()+
+  geom_sf(data=hex_cleaned)
+  
+```
+
+```{r}
+ggplot(hex_cleaned, aes(x = ridership, y = prediction)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = palette1) +
+  geom_abline(intercept=0, slope=1, color="#C96A52FF", alpha=0.3, size=1, style='dashed')+
+  labs(x = "Actual Ridership", y = "Predicted Ridership", 
+       title = "Actual v. Predicted Ridership", subtitle = "Each dot represents a hexbin") +
+  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
+           label = paste0("R-squared = ", round(summary(lm(ridership ~ prediction, data = final_hex7))$r.squared, 5)))+
+  plotTheme
+```
+
+# Application: Sun Metro Optimizer
+
+After finalizing our modeling process, we transferred our hexbin ridership predictions into our web app, [Sun Metro Optimizer](https://chuembucket.github.io/ElPaso-Bus-Network1/App/site/). The Sun Metro Optimizer is a web application that can be navigated to see existing route-level ridership and allow for users (Sun Metro transit planners) to upload new routes and assess their ridership and equity indicators in comparison to existing routes.
+
+[IMAGE HERE]
+
+When the planner opens the application, they have three different options to navigate between. The "predict ridership" tab allows users to see the actual and predicted ridership of each hex to understand potential under- or over-provision of transit services. The "current ridership" tab allows users to select individual existing routes to assess their average ridership, with the size of circles indicating ridership (greater the size, greater the ridership). The "import routes" tab allows users to upload a geojson file of bus stops, and a back-end aggregation function calculates predicted ridership of the route, and can also be compared to the other existing route's ridership.
+
+[IMAGE]
+
+Throughout this process, a dashboard at the bottom of the screen will populate with metrics divided as "revenue" and "equity." As aforementioned, we judged revenue optimization as optimizing route-level ridership. We judged equity on a few of our model variables, aggregated based on the hexes each route crosses into. Specifically, we utilized average racial distribution, median household income, sum of disabled people, and the balance of job opportunities to occupied housing units. This dashboard helps the planner better understand which routes are currently optimizing for these metrics, and how new routes can feed into the system while also optimizing for these metrics.
+
+[IMAGE]
+
+Because we are assessing primarily at the route and hexbin level, it is hard to see how new routes connect to existing routes and optimize these metrics for the system at large. However, this framework is just a proof of concept demonstration of how new routes can be graded against existing routes, and system-wide impacts would require deeper analysis once more efficiently drafted routes are created.
+
+With this application, we hope Sun Metro transit planners better understand how new bus transit scenarios optimize maximal ridership and a more equitable and accessible distribution of services for all populations.
+
+# Conclusion
+
+Sun Metro Optimizer aims to use our data-driven, politically unbiased, and equity and revenue optimizing model to understand improved bus transit route allocation. With accurate forecasts of ridership trends, Sun Metro transit planners can see areas that may be underserved by transit, and ensure that whilst they reach these regions, they optimize routes for ridership and equity.
