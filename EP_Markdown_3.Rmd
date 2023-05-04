@@ -593,7 +593,8 @@ We are building this model to inform our client's interest in knowing how bus tr
 
 Thus, this project is two-fold: a predictive bus transit ridership model and a performance-based measurement evaluating the equity and financial implications of transit demand.
 
-**Latent bus transit demand model:** We are predicting bus transit ridership based on 2022 ridership to model demand for transit services in the future. We are building correlative features into our model that are predictive of ridership while also maintaining the equity indicators essential to city-wide accessibility and efficiency of bus transit. **Informational network web app:** A web app where a Sun Metro planner can input their own .kml file of a new transit line and assess it on fare revenue (ridership) and equity (different independent variables assessing demographic distributions) optimization.
+**Latent bus transit demand model:** We are predicting bus transit ridership based on 2022 ridership to model demand for transit services in the future. We are building correlative features into our model that are predictive of ridership while also maintaining the equity indicators essential to city-wide accessibility and efficiency of bus transit.   
+**Informational network web app:** A web app where a Sun Metro planner can input their own .geojson file of a new transit line and assess it on fare revenue (ridership) and equity (different independent variables assessing demographic distributions) optimization.
 
 # Exploratory Data Analysis
 
@@ -2067,37 +2068,37 @@ vars_net <-
 
 Below is a correlation matrix of several variables used in our final model.
 
-```{r cormat, fig.width=30, fig.width=30}
-numericVars <- hex_final %>%
-  dplyr::select(-c("uniqueID", "ridership", "cvID", "prediction", "error", "geometry")) %>% st_drop_geometry() %>% na.omit()
-
-numericVars2 <- numericVars %>%
-  dplyr::select(1,2,3,4,6,10,11,12,15,23,25,26,28,29,31,67,71,72,73,74,78,79,81,82,83,98,101,104,107,110,113,116,119,122,125,128,131,134,137,140)
-
-numericVarsscale <- scale(numericVars2)
-
-numericVarsscale[numericVarsscale < -1] <- -1
-numericVarsscale[numericVarsscale > 1] <- 1
-# Use the cor() function to calculate the correlation matrix
-correlation_matrix <- cor(numericVarsscale)
-
-library(GPfit)
-
-corrplot(correlation_matrix,
-  method = "color",
-  title = "Correlation Matrix",
-  type="upper",
-  col = colorRampPalette(c(palette5cont[5], "white", palette6[4]))(100),
-  # type="lower",
-  # insig = "blank") +  
-  #   labs(title = "Correlation across numeric variables")+
-  # # guides(fill=guide_legend(title="Correlation"))+
-  # plotTheme()+
-  # theme(axis.text.x = element_text(angle=90))
-)
+```{r cormat, fig.width=16, fig.width=16}
+# numericVars <- hex_final %>%
+#   dplyr::select(-c("uniqueID", "ridership", "cvID", "prediction", "error", "geometry")) %>% st_drop_geometry() %>% na.omit()
+# 
+# numericVars2 <- numericVars %>%
+#   dplyr::select(1,2,3,4,6,10,11,12,15,23,25,26,28,29,31,67,71,72,73,74,78,79,81,82,83,98,101,104,107,110,113,116,119,122,125,128,131,134,137,140)
+# 
+# numericVarsscale <- scale(numericVars2)
+# 
+# numericVarsscale[numericVarsscale < -1] <- -1
+# numericVarsscale[numericVarsscale > 1] <- 1
+# # Use the cor() function to calculate the correlation matrix
+# correlation_matrix <- cor(numericVarsscale)
+# 
+# library(GPfit)
+# 
+# corrplot(correlation_matrix,
+#   method = "color",
+#   #title = "Correlation Matrix",
+#   type="upper",
+#   col = colorRampPalette(c(palette5cont[5], "white", palette6[4]))(100),
+#   # type="lower",
+#   # insig = "blank") +  
+#   #   labs(title = "Correlation across numeric variables")+
+#   # # guides(fill=guide_legend(title="Correlation"))+
+#   # plotTheme()+
+#   # theme(axis.text.x = element_text(angle=90))
+# )
 
 ```
-
+![Correlation Matrix of Selected Model Variables](https://github.com/jtrummler/ElPaso-Bus-Network/blob/main/images/corr.PNG?raw=true)
 
 # Modeling
 
