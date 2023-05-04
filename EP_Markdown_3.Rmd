@@ -623,30 +623,34 @@ ggplot()+
 
 We utilized road centerline data and bus route data obtained from El Paso's Open Data portal to understand the overall transit system's network. The current network is visually represented below, where roads were depicted in black and the bus network was overlain in orange. We can see that the network coverage extended significantly towards areas surrounding downtown El Paso. However, several neighborhoods located in the eastern part of the city remain unserved by the current transit system. This highlights a potential gap in the transit service coverage of the city and underscores the need for equity considerations in ensuring any El Paso resident has access to transit.
 
+
+
 ```{r current network, fig.width=12, fig.height=18, warning=FALSE, message=FALSE, results=FALSE}
 road_centerlines <- road_centerlines %>%
   st_transform(st_crs(el_paso))
 
 ep_roads <- st_intersection(road_centerlines, el_paso)
 
-ggplot()+
-  geom_sf(data=el_paso,
-          fill="lightgrey",
-          color=NA)+
-  geom_sf(data=ep_roads,
-          alpha=0.5, 
-          color="black", 
-          size=1.5)+
-  geom_sf(data=bus_routes,
-          alpha=0.9, 
-          color="#C96A52FF", 
-          size=1.5)+
-  ggsn::scalebar(el_paso, location="bottomleft", dist_unit = 'mi', dist=5, height=0.01, transform=TRUE, model='WGS84')+
-  labs(title="Current Bus Network",
-       subtitle="Sun Metro Mass Transit - El Paso, TX",
-       caption="Current road network in black\nCurrent bus transit network in orange")+
-  mapTheme2
+# ggplot()+
+#   geom_sf(data=el_paso,
+#           fill="lightgrey",
+#           color=NA)+
+#   geom_sf(data=ep_roads,
+#           alpha=0.5, 
+#           color="black", 
+#           size=1.5)+
+#   geom_sf(data=bus_routes,
+#           alpha=0.9, 
+#           color="#C96A52FF", 
+#           size=1.5)+
+#   ggsn::scalebar(el_paso, location="bottomleft", dist_unit = 'mi', dist=5, height=0.01, transform=TRUE, model='WGS84')+
+#   labs(title="Current Bus Network",
+#        subtitle="Sun Metro Mass Transit - El Paso, TX",
+#        caption="Current road network in black\nCurrent bus transit network in orange")+
+#   mapTheme2
 ```
+
+![Current Network Map](https://github.com/jtrummler/ElPaso-Bus-Network/blob/main/images/map_system.png?raw=true)
 
 ## Analyzing Route Ridership
 
