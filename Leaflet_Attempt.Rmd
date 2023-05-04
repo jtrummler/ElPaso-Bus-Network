@@ -275,6 +275,7 @@ stops_sf <- stops %>%
 
 riderstops <- read.csv(paste(data_folder, "/riderstops1.csv", sep = ''))
 
+riderstops <- read.csv("C:/Users/jtrum/pennmusa/MUSA8010/repository/data/riderstops1.csv")
 df <- riderstops %>%
   na.omit(riderstops[, c("stop_lat", "stop_lon")]) %>% 
   st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4269)
@@ -358,6 +359,94 @@ road_centerlines <- read_sf(paste(data_folder, "/EPCenterline.shp", sep = ''))
 ```
 
 ```{r}
-htmltools::HTML("my_map.html")
+RT_stop_avg <- df %>%
+  group_by(RT, TP, longitude, latitude) %>%
+  summarize(avg_ons = mean(Ons), 
+            avg_offs = mean(Offs),
+            total_ridership = sum(Ons) + sum(Offs))
+
+quintile_breaks <- classIntervals(RT_stop_avg$total_ridership, n = 5, style = "quantile")$brks
+
+colors <- c('#F2F1E4', '#EAD599', '#D19D5D', '#a7552a', '#7D0112')
+
+LL1 <- leaflet() %>%
+  addTiles(urlTemplate = "https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png") %>%
+  setView(lng = -106.485, lat = 31.763, zoom = 12) %>%
+  addCircleMarkers(data = RT_stop_avg, lng = ~longitude, lat = ~latitude,
+                   radius = 5,
+                   color = ~colors[cut(total_ridership, breaks = quintile_breaks)],
+                   fillOpacity = 0.95,
+                   popup = paste(
+                     "Route: ", RT_stop_avg$RT, "<br>",
+                     "Stop: ", RT_stop_avg$TP, "<br>",
+                     "Average Onboarding: ", round(RT_stop_avg$avg_ons, digits = 2), "<br>",
+                     "Average Offboarding: ", round(RT_stop_avg$avg_offs, digits = 2), "<br>",
+                     "Ridership (2022): ", round(RT_stop_avg$total_ridership), "<br>")) %>%
+  addLegend("bottomleft",
+            title = "Ridership per Route and Stop",
+            colors = colors,
+            labels = c(sprintf("%a - %a", quintile_breaks[1], quintile_breaks[2]),
+                       sprintf("%a - %a", quintile_breaks[2], quintile_breaks[3]),
+                       sprintf("%a - %a", quintile_breaks[3], quintile_breaks[4]),
+                       sprintf("%a - %a", quintile_breaks[4], quintile_breaks[5]),
+                       sprintf(">%a", quintile_breaks[5])),
+            opacity = 1)
+
+LL1
+
+```
+
+```{r}
+RT_stop_avg_local <- local %>%
+  group_by(RT, TP, longitude, latitude) %>%
+  summarize(avg_ons = mean(Ons), 
+            avg_offs = mean(Offs),
+            total_ridership = sum(Ons) + sum(Offs))
+
+quintile_breaks <- classIntervals(RT_stop_avg_local$total_ridership, n = 5, style='quantile')$brks
+
+colors <- c('#F2F1E4', '#EAD599', '#D19D5D', '#a7552a', '#7D0112')
+
+LL2 <- leaflet() %>%
+  addTiles(urlTemplate = "https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png") %>%
+  setView(lng = -106.485, lat = 31.763, zoom = 11) %>%
+  addCircleMarkers(data = RT_stop_avg_local, lng = ~longitude, lat = ~latitude,
+                   radius = 2,
+                   color = ~colors[cut(total_ridership, breaks = quintile_breaks)],
+                   fillOpacity = 0.65,
+                   popup = paste(
+                     "Route: ", RT_stop_avg_local$RT, "<br>",
+                     "Stop: ", RT_stop_avg_local$TP, "<br>",
+                     "Average Onboarding: ", round(RT_stop_avg_local$avg_ons, digits = 2), "<br>",
+                     "Average Offboarding: ", round(RT_stop_avg_local$avg_offs, digits = 2), "<br>",
+                     "Ridership (2022): ", round(RT_stop_avg_local$total_ridership*.85), "<br>")) %>%
+  addLegend("bottomleft",
+            title = "Ridership (2022) per Route and Stop (Quantiles)",
+            colors = colors,
+            labels = c(sprintf("%.0f - %.0f", quintile_breaks[1], quintile_breaks[2]),
+                       sprintf("%.0f - %.0f", quintile_breaks[2], quintile_breaks[3]),
+                       sprintf("%.0f - %.0f", quintile_breaks[3], quintile_breaks[4]),
+                       sprintf("%.0f - %.0f", quintile_breaks[4], quintile_breaks[5]),
+                       sprintf(">%.0f", quintile_breaks[5])),
+            opacity = 1)
+
+LL2
+
+```
+
+```{r}
+library(htmltools)
+save_html(LL2, "C:/Users/jtrum/pennmusa/MUSA8010/el-paso-ridership-2022/index.html")
+```
+
+```{r}
+
+brio <- st_read("C:/Users/jtrum/Downloads/Brio/Brio.shp") %>%
+  st_as_sf()
+ggplot()+
+  geom_sf(data=el_paso, fill="lightgrey")+
+  geom_sf(data=brio, aes(color=Name), size=50, fill=NA)+
+  scale_color_manual(values=c("#B0C72C", "#660066", "#00A8E7", "#FF6E00"))+
+  mapTheme2
 ```
 
