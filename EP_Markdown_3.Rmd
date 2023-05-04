@@ -460,6 +460,12 @@ local <- classified[classified$type %in% "Local", ]
 ```
 
 ```{r different ridership df aggregations, warning=FALSE, message=FALSE, results=FALSE}
+time <- df %>%
+  dplyr::filter(type %in% "Local") %>%
+  group_by(Date) %>%
+  summarize(ridership = sum(Ons) + sum(Offs))
+
+
 # Aggregating at route level for average and total ridership 
 RT_avg_sum <- df %>%
   group_by(RT) %>%
@@ -557,6 +563,8 @@ To check out our web application, click [here](https://chuembucket.github.io/ElP
 To check our Github Pages, click [here](https://github.com/jtrummler/ElPaso-Bus-Network).  
 
 ## Introduction and Use Case
+
+![Image Credit: KTSM 9 News](https://github.com/jtrummler/ElPaso-Bus-Network/blob/main/images/sunmetro.png?raw=true)
 
 > "El Paso, often forgotten, is building a stronger transit network than most US cities."\
 > Christof Spieler (Trains, Buses, People)
@@ -2059,7 +2067,7 @@ vars_net <-
 
 Below is a correlation matrix of several variables used in our final model.
 
-```{r cormat, fig.width=16, fig.width=16}
+```{r cormat, fig.width=30, fig.width=30}
 numericVars <- hex_final %>%
   dplyr::select(-c("uniqueID", "ridership", "cvID", "prediction", "error", "geometry")) %>% st_drop_geometry() %>% na.omit()
 
@@ -2110,15 +2118,15 @@ corrplot(correlation_matrix,
 
 After finalizing our modeling process, we transferred our hexbin ridership predictions into our web app, [Sun Metro Optimizer](https://chuembucket.github.io/ElPaso-Bus-Network1/App/site/). The Sun Metro Optimizer is a web application that can be navigated to see existing route-level ridership and allow for users (Sun Metro transit planners) to upload new routes and assess their ridership and equity indicators in comparison to existing routes.
 
-[IMAGE HERE]
+![Sun Metro Optimizer](https://github.com/jtrummler/ElPaso-Bus-Network/blob/main/images/app1.PNG?raw=true)
 
 When the planner opens the application, they have three different options to navigate between. The "predict ridership" tab allows users to see the actual and predicted ridership of each hex to understand potential under- or over-provision of transit services. The "current ridership" tab allows users to select individual existing routes to assess their average ridership, with the size of circles indicating ridership (greater the size, greater the ridership). The "import routes" tab allows users to upload a geojson file of bus stops, and a back-end aggregation function calculates predicted ridership of the route, and can also be compared to the other existing route's ridership.
 
-[IMAGE]
+![Sun Metro Optimizer](https://github.com/jtrummler/ElPaso-Bus-Network/blob/main/images/app2.PNG?raw=true)
 
 Throughout this process, a dashboard at the bottom of the screen will populate with metrics divided as "revenue" and "equity." As aforementioned, we judged revenue optimization as optimizing route-level ridership. We judged equity on a few of our model variables, aggregated based on the hexes each route crosses into. Specifically, we utilized average racial distribution, median household income, sum of disabled people, and the balance of job opportunities to occupied housing units. This dashboard helps the planner better understand which routes are currently optimizing for these metrics, and how new routes can feed into the system while also optimizing for these metrics.
 
-[IMAGE]
+![Sun Metro Optimizer](https://github.com/jtrummler/ElPaso-Bus-Network/blob/main/images/app3.PNG?raw=true)
 
 Because we are assessing primarily at the route and hexbin level, it is hard to see how new routes connect to existing routes and optimize these metrics for the system at large. However, this framework is just a proof of concept demonstration of how new routes can be graded against existing routes, and system-wide impacts would require deeper analysis once more efficiently drafted routes are created.
 
