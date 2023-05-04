@@ -41,6 +41,8 @@ library(gridExtra)
 library(scales)
 library(viridis)
 library(leaflet)
+library(corrplot)
+library(corrr)
 library(ggplotify)
 library(ggmap)
 library(classInt)
@@ -550,7 +552,9 @@ RT_stop_avg_st <- st_drop_geometry(RT_stop_avg) # no geom
 
 This project was created by Charlie Huemmler, Yingxue Ou, and Jack Rummler as part of the University of Pennsylvania's Master of Urban Spatial Analytics and Smart Cities practicum (MUSA 801). We would like to thank our client, Alex Hoffman, AICP, of the El Paso Capital Improvements Department for his continual knowledge, eagerness to help, and enthusiasm for this project. We also would like to thank Professors Matthew Harris, Michael Fichman, and Mjumbe Poe for their invaluable assistance and mentorship throughout this process.
 
-To check out other practicum projects for the MUSA/Smart Cities practicum, click [here](https://pennmusa.github.io/MUSA_801.io/). To check out our web application, click [here](https://chuembucket.github.io/ElPaso-Bus-Network1/App/site/). To check our Github Pages, click [here](https://github.com/jtrummler/ElPaso-Bus-Network).
+To check out other practicum projects for the MUSA/Smart Cities practicum, click [here](https://pennmusa.github.io/MUSA_801.io/).  
+To check out our web application, click [here](https://chuembucket.github.io/ElPaso-Bus-Network1/App/site/).  
+To check our Github Pages, click [here](https://github.com/jtrummler/ElPaso-Bus-Network).  
 
 ## Introduction and Use Case
 
@@ -587,7 +591,8 @@ Thus, this project is two-fold: a predictive bus transit ridership model and a p
 
 In this section, we look at both the context area of El Paso and how it relates to transit ridership, in addition to the data given to us by our client.
 
-**El Paso Context:** El Paso has a unique positionality and geography that makes roadway infrastructure complex, inherently impacting the structure of bus routes. **Ridership Data:** The El Paso Capital Improvements Department supplied us with ridership data for the year 2022. This data was collected at every route and stop in the transit network by collecting onboarding and offboarding data using bus sensors. Note that only about 85% of buses had these sensors at any given time, thus there is some inherent bias in the data; however, it does still paint a high level picture of ridership patterns in the city.
+**El Paso Context:** El Paso has a unique positionality and geography that makes roadway infrastructure complex, inherently impacting the structure of bus routes.  
+**Ridership Data:** The El Paso Capital Improvements Department supplied us with ridership data for the year 2022. This data was collected at every route and stop in the transit network by collecting onboarding and offboarding data using bus sensors. Note that only about 85% of buses had these sensors at any given time, thus there is some inherent bias in the data; however, it does still paint a high level picture of ridership patterns in the city.
 
 ## El Paso Context
 
@@ -618,7 +623,7 @@ ggplot()+
 
 We utilized road centerline data and bus route data obtained from El Paso's Open Data portal to understand the overall transit system's network. The current network is visually represented below, where roads were depicted in black and the bus network was overlain in orange. We can see that the network coverage extended significantly towards areas surrounding downtown El Paso. However, several neighborhoods located in the eastern part of the city remain unserved by the current transit system. This highlights a potential gap in the transit service coverage of the city and underscores the need for equity considerations in ensuring any El Paso resident has access to transit.
 
-```{r current network, fig.width=12, warning=FALSE, message=FALSE, results=FALSE}
+```{r current network, fig.width=12, fig.height=18, warning=FALSE, message=FALSE, results=FALSE}
 road_centerlines <- road_centerlines %>%
   st_transform(st_crs(el_paso))
 
@@ -802,7 +807,7 @@ Along the southwest border, there are several census tracts, that despite having
 
 Finally, we created a Leaflet map to allow interactivity with El Paso, and broke down total local ridership in 2022 to a quintile level. You can check out the map with this [link](https://jtrummler.github.io/el-paso-ridership-2022/).
 
-[IMAGES]
+![Leaflet Map - Ridership for year 2022 at stop and route level, divided by quintiles](https://github.com/jtrummler/ElPaso-Bus-Network/blob/main/images/leaflet.PNG?raw=true)
 
 Some insights we derived from this map:
 
@@ -1805,38 +1810,38 @@ ggplot(osm_points_st, aes(y = type)) +
 
 Below is a nearest neighbor distribution of each feature.
 
-```{r different osm plots, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
+```{r different osm plots, warning=FALSE, message=FALSE, results=FALSE, fig.width=12, fig.height=24}
 health <- rbind(hospital_points, clinic_points, pharmacy_points)
 entertainment <- rbind(worship_points, cinema_points, theatre_points)
 shop <- rbind(department_store_points, supermarket_points, mall_points)
 food <- rbind(restaurant_points, cafe_points, bar_points)
 
-grid.arrange(
-ggplot()+
-  geom_sf(data=el_paso, fill="grey")+
-  geom_sf(data=health, aes(color=type))+
-  scale_color_manual(values=c(palette6[3:5]), name="Type")+
-  labs(title="Healthcare Facilities")+
-  mapTheme,
-ggplot()+
-  geom_sf(data=el_paso, fill="grey")+
-  geom_sf(data=entertainment, aes(color=type))+
-  scale_color_manual(values=c(palette6[3:5]), name="Type")+
-  labs(title="Entertainment Places")+
-  mapTheme,
-ggplot()+
-  geom_sf(data=el_paso, fill="grey")+
-  geom_sf(data=shop, aes(color=type))+
-  scale_color_manual(values=c(palette6[3:5]), name="Type")+
-  labs(title="Shopping Centers")+
-  mapTheme,
-ggplot()+
-  geom_sf(data=el_paso, fill="grey")+
-  geom_sf(data=food, aes(color=type))+
-  scale_color_manual(values=c(palette6[3:5]), name="Type")+
-  labs(title="Eateries")+
-  mapTheme,
-ncol=3)
+# grid.arrange(
+# ggplot()+
+#   geom_sf(data=el_paso, fill="grey")+
+#   geom_sf(data=health, aes(color=type))+
+#   scale_color_manual(values=c(palette6[3:5]), name="Type")+
+#   labs(title="Healthcare Facilities")+
+#   mapTheme,
+# ggplot()+
+#   geom_sf(data=el_paso, fill="grey")+
+#   geom_sf(data=entertainment, aes(color=type))+
+#   scale_color_manual(values=c(palette6[3:5]), name="Type")+
+#   labs(title="Entertainment Places")+
+#   mapTheme,
+# ggplot()+
+#   geom_sf(data=el_paso, fill="grey")+
+#   geom_sf(data=shop, aes(color=type))+
+#   scale_color_manual(values=c(palette6[3:5]), name="Type")+
+#   labs(title="Shopping Centers")+
+#   mapTheme,
+# ggplot()+
+#   geom_sf(data=el_paso, fill="grey")+
+#   geom_sf(data=food, aes(color=type))+
+#   scale_color_manual(values=c(palette6[3:5]), name="Type")+
+#   labs(title="Eateries")+
+#   mapTheme,
+# ncol=3)
 
 grid.arrange(
 ggplot()+
@@ -2046,19 +2051,55 @@ vars_net <-
     )
 ```
 
+## Correlation Matrix
+
+Below is a correlation matrix of several variables used in our final model.
+
+```{r cormat, fig.width=16, fig.width=16}
+numericVars <- hex_final %>%
+  dplyr::select(-c("uniqueID", "ridership", "cvID", "prediction", "error", "geometry")) %>% st_drop_geometry() %>% na.omit()
+
+numericVars2 <- numericVars %>%
+  dplyr::select(1,2,3,4,6,10,11,12,15,23,25,26,28,29,31,67,71,72,73,74,78,79,81,82,83,98,101,104,107,110,113,116,119,122,125,128,131,134,137,140)
+
+numericVarsscale <- scale(numericVars2)
+
+numericVarsscale[numericVarsscale < -1] <- -1
+numericVarsscale[numericVarsscale > 1] <- 1
+# Use the cor() function to calculate the correlation matrix
+correlation_matrix <- cor(numericVarsscale)
+
+library(GPfit)
+
+corrplot(correlation_matrix,
+  method = "color",
+  title = "Correlation Matrix",
+  type="upper",
+  col = colorRampPalette(c(palette5cont[5], "white", palette6[4]))(100),
+  # type="lower",
+  # insig = "blank") +  
+  #   labs(title = "Correlation across numeric variables")+
+  # # guides(fill=guide_legend(title="Correlation"))+
+  # plotTheme()+
+  # theme(axis.text.x = element_text(angle=90))
+)
+
+```
+
+
 # Modeling
 
 
 ```{r}
-ggplot(hex_cleaned, aes(x = ridership, y = prediction)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, color = palette1) +
-  geom_abline(intercept=0, slope=1, color="#C96A52FF", alpha=0.3, size=1, style='dashed')+
-  labs(x = "Actual Ridership", y = "Predicted Ridership", 
-       title = "Actual v. Predicted Ridership", subtitle = "Each dot represents a hexbin") +
-  annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
-           label = paste0("R-squared = ", round(summary(lm(ridership ~ prediction, data = final_hex7))$r.squared, 5)))+
-  plotTheme
+# ggplot(hex_cleaned, aes(x = ridership, y = prediction)) +
+#   geom_point() +
+#   geom_smooth(method = "lm", se = FALSE, color = palette1) +
+#   geom_abline(intercept=0, slope=1, color="#C96A52FF", alpha=0.3, size=1, style='dashed')+
+#   labs(x = "Actual Ridership", y = "Predicted Ridership", 
+#        title = "Actual v. Predicted Ridership", subtitle = "Each dot represents a hexbin") +
+#   annotate("text", x = Inf, y = Inf, hjust = 1.5, vjust = 1.5,
+#            label = paste0("R-squared = ", round(summary(lm(ridership ~ prediction, data = final_hex7))$r.squared, 5)))+
+#   plotTheme
 ```
 
 # Application: Sun Metro Optimizer
