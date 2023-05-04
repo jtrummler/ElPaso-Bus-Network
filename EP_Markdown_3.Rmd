@@ -1,7 +1,7 @@
 ---
 title: "Planning and Forecasting for El Paso's Bus Transit Alternatives"
 author: "Charlie Huemmler, Yingxue Ou, Jack Rummler"
-date: "2023-05-02"
+date: "2023-05-04"
 output: 
   rmdformats::downcute:
     code_folding: hide
@@ -967,7 +967,7 @@ acs_correlations <- left_join(agg_data_st, acs_ep_hex, by="GEOID")
 
 ### Racial Distribution in El Paso
 
-Four maps of the White, Hispanic/Latino, Black, and Asian populations are below. It appears that there is racial segregation, as census tracts with the greatest density of Black residents seem to have decreased amount of White and Latino residents. There also is a strip along the Rio Grande in the southeastern part of the city where there is an incredibly high density of Hispanic/Latino residents. A high density of Asian residents seem to live just northwest of downtown.
+Six maps of the total, White, Hispanic/Latino, Black, Asian, and other race populations are below. It appears that there is racial segregation, as census tracts with the greatest density of Black residents seem to have decreased amount of White and Latino residents. There also is a strip along the Rio Grande in the southeastern part of the city where there is an incredibly high density of Hispanic/Latino residents. A high density of Asian residents seem to live just northwest of downtown. With an interest in ensuring all demographic groups have access to transit, understanding racial distribution is essential to design routes that equitably serve all races.
 
 ```{r race distribution maps, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 grid.arrange(ncol=3,
@@ -1007,7 +1007,7 @@ grid.arrange(ncol=3,
 
 ### Household Vacancy
 
-Vacant households may contribute to ridership demand; if units are unoccupied, there is a decreased density of residents and thus less people who may need to utilize buses. There seems to be a relatively random spatial pattern on percentage of vacant housing units. It appears more densified areas such as downtown see higher rates of vacancy.
+Vacant households may contribute to ridership demand; if units are unoccupied, there is a decreased density of residents and thus less people who may need to utilize buses. There seems to be a relatively random spatial pattern on percentage of vacant housing units. It appears more densified areas such as downtown see higher rates of vacancy, with high vacanies also along some of the popular BRIO corridors into the north and east.
 
 ```{r vacant HU pct, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 ggplot()+
@@ -1023,7 +1023,7 @@ ggplot()+
 
 ### Median Household Income
 
-Household income is a significant factor in transit demand, particularly for lower income households who may rely more heavily on public transportation due to the cost of car ownership. Interestingly, there appears to be a spatial clustering of Hispanic/Latino residents in census tracts with the lowest median household income. On the other hand, census tracts around the University of Texas-El Paso in the northwest part of the city seem to have the highest median household income. These patterns of median household income show some rigidity, with noticeable clustering of income distribution within certain areas.
+Additionally, we want to equitably serve people of all socioeconomic statuses with transit, while also ensuring areas of disinvestment/lower median household income gain greater capital investments in transit infrastructure. There is a spatial clustering effect here: highest income in the sprawling north and east and lowest income in downtown into the southeast. It appears that some of the lowest transit ridership regions also have the lowest median household income, indicating either a need for increased supply or services, or that demand for transit may not exist in these regions.
 
 ```{r cen plot3, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 ggplot()+
@@ -1118,9 +1118,8 @@ nwi_bg_st <- st_drop_geometry(nwi_bg)
 
 The nearest transit accessibility score is calculated as the distance (in meters) from the population-weighted centroid. This involves aggregating all bus stops within each census block into the block, determining the centroid of the block based on population distribution, and calculating the distance between the centroid and its nearest stop. This method takes into account accessibility for the greatest number of people within the block, which is its strength. However, there may be issues with the choice of areal unit.
 
-For the purpose of visualization, census blocks that do not have a transit stop within them were removed from the data, as they were assigned a value of -99999. From the remaining blocks, the histogram shows a unimodal distribution with a peak around 400 meters, indicating that a transit stop is within 0.25 miles from the population-weighted centroid for the majority of census block groups. While this generally aligns with the metric of transit accessibility, which is often measured as a transit stop within 0.25 or 0.5 miles of home, it is challenging to determine if this is the most effective measure for transit accessibility given it does not look at data at the household level.
+For the purpose of visualization, census blocks that do not have a transit stop within them were reassigned a value of -1, as they were originally assigned a value of -99999, heavily skewing the data. From the remaining blocks, the histogram shows a unimodal distribution with a peak around 400 meters, indicating that a transit stop is within 0.25 miles from the population-weighted centroid for the majority of census block groups. While this generally aligns with the metric of transit accessibility, which is often measured as a transit stop within 0.25 or 0.5 miles of home, it is challenging to determine if this is the most effective measure for transit accessibility given it does not look at data at the household level.
 
-> NEEDS EDITS\<
 
 ```{r nearest transit, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 grid.arrange(ncol=2,
@@ -1176,7 +1175,7 @@ ggplot()+
 
 ### Intersection Density (D3B)
 
-> NEEDS SOMETHING\<
+Intersection density could be a useful transit ridership metric given that if much existing roadway infrastructure already exists could indicate potential for increased ridership, ease of new route formation, and transit-oriented development potential. Moreover, intersection density can be conducive to walkability, urban density, transit demand, and trip chaining.
 
 ```{r intersection density dist, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 
@@ -1204,6 +1203,8 @@ ggplot()+
 ```
 
 ### Employment Diversity to Occupied Housing
+
+Finally, we also look at the employment to household mix score. This illustrates the diversity of employment sectors and job types to occupied housing units within the census block, which is scored on a scale of 0 to 1. This is a useful metric looking at both ridership and equity: areas of increased household occupancy and employment opportunity may increase ridership demand while diversity in job types allows equitable access to transit ridership opportunity. In the map below, we see some clustering of high scores in the northwest, which does have UT-El Paso and a high density of higher income, and some essential shopping and entertainment corridors in the east.
 
 ```{r employment HH mix, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 grid.arrange(ncol=2,
@@ -1344,7 +1345,7 @@ lhed_ep_st <- lehd_ep %>%
 
 ### Income Distribution of Jobs - Monthly Income
 
-We calculated the percentage of each monthly income bracket of the census tracts - which in LEHD are divided as making under \$1250 per month, between \$1251 and \$3333 per month, or over \$3334 per month.
+We calculated the percentage of each monthly income bracket of the census tracts - which in LEHD are divided as making under 1250 per month, between 1251 and 3333 per month, or over 3334 per month. There appears to be small clusters of each income bracket found throughout the map; specifically similar clustering patterns among the lowest and middle income brackets with much different clusters in the higher income bracket.
 
 ```{r income dist, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 grid.arrange(ncol=3,
@@ -1372,28 +1373,9 @@ ggplot()+
 )
 ```
 
-> MORE INFO\<
-
-```{r bar chart income dist,warning=FALSE, message=FALSE, results=FALSE, fig.height=8, fig.width=12}
-epworkincome <- hex_final[, c("uniqueID", "income1250LessPct", "income1251to3333Pct", "income3333OverPct")] %>% st_drop_geometry()
-
-epworktidy <- epworkincome %>%
-  gather(key = "IncomeLevel", value = "Income", -uniqueID)
-
-ggplot(epworktidy, aes(x = Income, y = uniqueID, fill = IncomeLevel)) +
-  geom_bar(stat = "identity", position = "stack", width=2) +
-  scale_fill_manual(values=c(palette5cont[5:3]),
-                    labels=c("< 1250", "Between 1251 and 3334", " > 3334"))+
-  labs(y = "Hex", x = "Income", fill = "Monthly Income ($)", title = "Job Income Breakdown at Hexbin Level",
-       subtitle = "El Paso, TX",
-       caption = "Data: LEHD, 2019") +
-  plotTheme+
-  theme(axis.text.y = element_blank(), legend.position = "bottom")
-```
-
 ### Age Distribution of Jobs
 
-> DESCRIPTION\<
+Additionally, we calculated the percentage of each age bracket of the census tracts - which in LEHD are divided as under 29, 30 to 54, or over 55. Similarly to the income bracket, there seems to be spatial clustering in similar locations for ages under 54 and over 55.
 
 ```{r age dist, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 grid.arrange(ncol=3, top="Age Bracket Distribution of Jobs",
@@ -1423,7 +1405,7 @@ ggplot()+
 
 ### Job Types
 
-> INFO\<
+LEHD also provides job sector data, with each hex presented below with percent distribution of type of job.
 
 ```{r jobs_table}
 epworkjobs <- lehd_ep[, c("GEOID",
@@ -1456,9 +1438,9 @@ datatable(epworkjobs)
 
 Open Data El Paso is the city's open-source data platform. We pulled several demographic and built environment features to engineer into our model that explain the impacts of transit demand. Particularly, we calculated 1st, 3rd, and 5th nearest neighbor distances for each of our features.
 
-### Schools
+We gathered distance information for parks, schools, and roadway infrastructure. We assumed for parks and schools that people may use transit to access these amenities and diverse groups use and benefit from these services. We assumed major roadways are predictive of ridership as several transit routes with high ridership fall along major roadway corridors. 
 
-Distance to schools can serve as a potentially strong indicator of transit demand given high concentration of potential riders (students, teachers, staff), consistent travel patterns (circuitous), and \>INFO\<
+The nearest feature to each hexbin is mapped below.
 
 ```{r schools data cleaning, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 schools <- schools %>%
@@ -1476,42 +1458,18 @@ schools <- schools %>%
 #        caption="Source: Open Data El Paso, 2023")+
 #   mapTheme
 
-
-ggplot()+
-  geom_sf(data=hex_final, aes(fill=(schools.nn1)), color=NA)+
-  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="%")+
-  labs(title="Distance to Nearest School",
-       caption="Data: Open Data El Paso")+
-  mapTheme3+
-  theme(legend.position = 'bottom')
-
-```
-
-### Parks
-
-> INFO\<
-
-```{r parks data, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 parks <- parks %>%
   dplyr::filter(CATEGORY %in% c("City Park", "Open Space", "Trail", "Trailhead"))
-
-# ggplot() +
-  geom_sf(data = el_paso, fill = "grey", color = NA) +
-  geom_sf(data = parks, aes(fill = CATEGORY, color = CATEGORY), size = 2, alpha=0.85) +
-  scale_fill_manual(values = palette6[1:4], name = "Type") +
-  scale_color_manual(values = palette6[1:4], name = "Type") +
-  guides(color = guide_legend(override.aes = list(shape = 22, size = 5, fill=palette6[1:4], color=palette6[1:4]))) +
-  labs(title="Parks",
-       subtitle="El Paso, TX",
-       caption="Source: Open Data El Paso, 2023")+
-  mapTheme
-```
-
-### Road Infrastructure
-
-> INFO\<
-
-```{r road classification and count roads, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
+# # ggplot() +
+#   geom_sf(data = el_paso, fill = "grey", color = NA) +
+#   geom_sf(data = parks, aes(fill = CATEGORY, color = CATEGORY), size = 2, alpha=0.85) +
+#   scale_fill_manual(values = palette6[1:4], name = "Type") +
+#   scale_color_manual(values = palette6[1:4], name = "Type") +
+#   guides(color = guide_legend(override.aes = list(shape = 22, size = 5, fill=palette6[1:4], color=palette6[1:4]))) +
+#   labs(title="Parks",
+#        subtitle="El Paso, TX",
+#        caption="Source: Open Data El Paso, 2023")+
+#   mapTheme
 road_class <- c(
   "LOCAL" = "Local",
   "MINOR" = "Minor",
@@ -1536,78 +1494,86 @@ class_count <- table(roads_sf$CLASS)
 
 class_count_df <- data.frame(CLASS = names(class_count), Count = as.vector(class_count))
 
-ggplot(class_count_df, aes(x = CLASS, y = Count, fill = CLASS)) +
-  geom_col() +
-  scale_fill_manual(values=c(palette6),
-                    name='Road Class')+
-  labs(title = "Road Classifications",
-       subtitle = "El Paso, TX",
-       caption = "Data: Open Data El Paso, 2023",
-       x = "Class",
-       y = "Count") +
-  plotTheme
-```
+# ggplot(class_count_df, aes(x = CLASS, y = Count, fill = CLASS)) +
+#   geom_col() +
+#   scale_fill_manual(values=c(palette6),
+#                     name='Road Class')+
+#   labs(title = "Road Classifications",
+#        subtitle = "El Paso, TX",
+#        caption = "Data: Open Data El Paso, 2023",
+#        x = "Class",
+#        y = "Count") +
+#   plotTheme
 
-> INFO\<
-
-```{r major roads map, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 major <- roads %>%
   dplyr::filter(CLASS == "Major") %>%
   st_transform(crs=4269)
 
 majorEP <- st_intersection(el_paso, major)
 
+# grid.arrange(ncol=3,
+# ggplot() +
+#   geom_sf(data = el_paso, fill = "grey", color = NA) +
+#   geom_sf(data = schools, aes(color = TYPE_), size = 2, alpha=0.85) +
+#   scale_color_manual(values = palette6, name = "Type") +
+#   guides(color = guide_legend(override.aes = list(shape = 22, size = 5, fill=palette6))) +
+#   labs(title="Schools",
+#        subtitle="El Paso Independent School District",
+#        caption="Source: Open Data El Paso, 2023")+
+#   mapTheme+theme(legend.position= "bottom"),
+# ggplot() +
+#   geom_sf(data = el_paso, fill = "grey", color = NA) +
+#   geom_sf(data = parks, aes(fill = CATEGORY, color = CATEGORY), size = 2, alpha=0.85) +
+#   scale_fill_manual(values = palette6[1:4], name = "Type") +
+#   scale_color_manual(values = palette6[1:4], name = "Type") +
+#   guides(color = guide_legend(override.aes = list(shape = 22, size = 5, fill=palette6[1:4], color=palette6[1:4]))) +
+#   labs(title="Parks",
+#        subtitle="El Paso, TX",
+#        caption="Source: Open Data El Paso, 2023")+
+#   mapTheme+theme(legend.position= "bottom"),
+# ggplot()+
+#   geom_sf(data = el_paso, fill = "grey", color = NA) +
+#   geom_sf(data = majorEP, aes(fill=CLASS, color=CLASS), size = 4, alpha=0.85) +
+#   scale_fill_manual(values=palette1, name='Road Class')+
+#   scale_color_manual(values=palette1, name='Road Class')+
+#   labs(title="Major Roads",
+#        subtitle="El Paso, TX",
+#        caption="Data: Open Data El Paso, 2023")+
+#   mapTheme+theme(legend.position= "bottom"))
+
 grid.arrange(ncol=3,
-ggplot() +
-  geom_sf(data = el_paso, fill = "grey", color = NA) +
-  geom_sf(data = schools, aes(color = TYPE_), size = 2, alpha=0.85) +
-  scale_color_manual(values = palette6, name = "Type") +
-  guides(color = guide_legend(override.aes = list(shape = 22, size = 5, fill=palette6))) +
-  labs(title="Schools",
-       subtitle="El Paso Independent School District",
-       caption="Source: Open Data El Paso, 2023")+
-  mapTheme+theme(legend.position= "bottom"),
-ggplot() +
-  geom_sf(data = el_paso, fill = "grey", color = NA) +
-  geom_sf(data = parks, aes(fill = CATEGORY, color = CATEGORY), size = 2, alpha=0.85) +
-  scale_fill_manual(values = palette6[1:4], name = "Type") +
-  scale_color_manual(values = palette6[1:4], name = "Type") +
-  guides(color = guide_legend(override.aes = list(shape = 22, size = 5, fill=palette6[1:4], color=palette6[1:4]))) +
-  labs(title="Parks",
-       subtitle="El Paso, TX",
-       caption="Source: Open Data El Paso, 2023")+
-  mapTheme+theme(legend.position= "bottom"),
 ggplot()+
-  geom_sf(data = el_paso, fill = "grey", color = NA) +
-  geom_sf(data = majorEP, aes(fill=CLASS, color=CLASS), size = 4, alpha=0.85) +
-  scale_fill_manual(values=palette1, name='Road Class')+
-  scale_color_manual(values=palette1, name='Road Class')+
-  labs(title="Major Roads",
-       subtitle="El Paso, TX",
-       caption="Data: Open Data El Paso, 2023")+
-  mapTheme+theme(legend.position= "bottom"))
-```
-
-```{r}
+  geom_sf(data=hex_final, aes(fill=(schools.nn1)), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  labs(title="Distance to Nearest School", subtitle="El Paso, TX",
+       caption="Data: Open Data El Paso")+
+  mapTheme3+
+  theme(legend.position = 'bottom'),
 ggplot()+
-  geom_sf(data = el_paso, fill = "grey", color = NA) +
-  geom_sf(data = majorEP, aes(fill=CLASS, color=CLASS), size = 4, alpha=0.85) +
-  scale_fill_manual(values=palette1, name='Road Class')+
-  scale_color_manual(values=palette1, name='Road Class')+
-  labs(title="Major Roads",
-       subtitle="El Paso, TX",
-       caption="Data: Open Data El Paso, 2023")+
-  mapTheme
-```
+  geom_sf(data=hex_final, aes(fill=(parks.nn1)), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  labs(title="Distance to Nearest Park", subtitle="El Paso, TX",
+       caption="Data: Open Data El Paso")+
+  mapTheme3+
+  theme(legend.position = 'bottom'),
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=(major_road.nn1)), color=NA)+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  labs(title="Distance to Nearest Major Roadway", subtitle="El Paso, TX",
+       caption="Data: Open Data El Paso")+
+  mapTheme3+
+  theme(legend.position = 'bottom')
+)
 
+```
 ## Open Street Map
 
 Open Street Map (OSM) is an open-source, collaborative, free geographic database in which users can aggregate features related to different environmental features of a place, such as buildings, land uses, and roadways. We hypothesized that distance to a variety of built environment features may be predictive of bus ridership. We chose features from keys "amenity" and "shop" listed below:
 
--   **Amenities:** hospital, clinic, doctors, pharmacy, restaurant, cafe, bar, place_of_worship, arts_centre, cinema, theatre
--   **Shops:** department_store, general, supermarket, mall
+-   **Amenities:** hospital, clinic, pharmacy, restaurant, cafe, bar, place_of_worship, cinema, theatre
+-   **Shops:** department_store, supermarket, mall
 
-One thing to note about OSM is that since it is a volunteer-based platform, it is not guaranteed every feature that matches each value may yet be aggregated into Open Street Map; however, we included all of these features given there seemed to be ample amount of points for each that still explained the spatial distribution of features in El Paso.
+One thing to note about OSM is that since it is a volunteer-based platform, it is not guaranteed every feature that matches each value may yet be aggregated into Open Street Map; however, we included all of these features still give a high-level overview of amenity distribution in the city. We chose these amenities in particular as they all have "live, work, play" attributes; these amenities may be crucial to access (e.g. pharmacy, hospital) or for entertainment purposes (e.g. theatre, bar) or for employment opportunity (e.g. supermarket, clinic). Again, distance to these features was calculated, with the nearest of each amenity to each hexbin mapped below.
 
 ```{r for loop amenities, warning=FALSE, message=FALSE, results=FALSE}
 # Hospital
@@ -1819,7 +1785,7 @@ osm_points <- rbind(
 
 ### Feature Counts
 
-> INFO\<
+We can see places of worship and restaurants are the most populous features, while malls and bars are the least populous.
 
 ```{r osm plot 1, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 osm_points_st <- osm_points %>%
@@ -1837,7 +1803,7 @@ ggplot(osm_points_st, aes(y = type)) +
 
 ### Feature Distributions
 
-Below is a point-level distribution of each feature, separated into four maps with shared characteristics. \>INFO\<
+Below is a nearest neighbor distribution of each feature.
 
 ```{r different osm plots, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
 health <- rbind(hospital_points, clinic_points, pharmacy_points)
@@ -1870,50 +1836,70 @@ ggplot()+
   scale_color_manual(values=c(palette6[3:5]), name="Type")+
   labs(title="Eateries")+
   mapTheme,
-ncol=2)
-```
+ncol=3)
 
-## Spatial Effect - Transit Bays
-
-> INFO\<
-
-```{r spatial effects, warning=FALSE, message=FALSE, results=FALSE, fig.width=12}
-bays <- local_transit_bays %>%
-  mutate(Bay = ifelse(name == "BERT WILLIAMS DOWNTOWN SANTA FE TRANSIT CENTER", "Downtown",
-                    ifelse(name == "ARTURO TURY BENAVIDES CIELO VISTA TRANSIT CENTER", "Cielo Vista",
-                             ifelse(name == "UPPER EAST SIDE TRANSIT CENTER", "Upper East Side",
-                                    ifelse(name == "ROBERT E. MCKEE FIVE POINTS TRANSIT CENTER", "Five Points",
-                                           ifelse(name == "GLORY ROAD TRANSIT CENTER", "Glory Road",
-                                                  ifelse(name == "NESTOR A. VALENCIA MISSION VALLEY TRANSIT CENTER", "Mission Valley",
-                                                         ifelse(name == "ARVES E. JONES SR. TRANSIT CENTER AT NORTHGATE", "Northgate",
-                                                                ifelse(name == "AL JEFFERSON WESTSIDE TRANSIT CENTER", "Westside", NA))))))))) %>%
-  drop_na()  
-
-bays_st <- bays %>%
-  st_drop_geometry()
-
-bay1 <- ggplot(bays_st, aes(x = Bay)) +
-  geom_bar(fill=c(palette8)) +
-  labs(x = "Bay", y = "Count", title = "Number of Stops in Each Bay")+
-  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
-  scale_y_continuous(breaks = seq(0, 10, 2))+
-  plotTheme
-
-bay2 <- ggplot()+
-  geom_sf(data=el_paso)+
-  geom_sf(data=bays, aes(color=Bay), size=4)+
-  scale_color_manual(values=palette8)+
-  theme(legend.position = "right", 
-        legend.direction = "vertical")+
-  labs(title="Transit Centers - El Paso, TX")+
-  guides(color = guide_legend(override.aes = list(fill = palette8)))+
-  mapTheme+ theme(legend.position = "bottom", legend.direction = "horizontal")
-
-bay_points <- local_transit_bays %>%
-  dplyr::select("geometry") %>%
-  mutate(type = "transit_bay")
-
-grid.arrange(ncol=2, bay1, bay2)
+grid.arrange(
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=hospitals.nn1), color=NA)+
+  labs(title="Distance to Nearest Hospital")+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=clinics.nn1), color=NA)+
+  labs(title="Distance to Nearest Clinic")+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=pharmacies.nn1), color=NA)+
+  labs(title="Distance to Nearest Pharmacy")+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=restaurants.nn1), color=NA)+
+  labs(title="Distance to Nearest Restaurant")+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=cafes.nn1), color=NA)+
+  labs(title="Distance to Nearest Cafe")+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=bars.nn1), color=NA)+
+  labs(title="Distance to Nearest Bar")+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=worship_places.nn1), color=NA)+
+  labs(title="Distance to Nearest Place of Worship")+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=cinemas.nn1), color=NA)+
+  labs(title="Distance to Nearest Cinema")+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=theatres.nn1), color=NA)+
+  labs(title="Distance to Nearest Theatre")+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=department_stores.nn1), color=NA)+
+  labs(title="Distance to Nearest Department Store")+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=malls.nn1), color=NA)+
+  labs(title="Distance to Nearest Mall")+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  mapTheme3,
+ggplot()+
+  geom_sf(data=hex_final, aes(fill=supermarkets.nn1), color=NA)+
+  labs(title="Distance to Nearest Supermarket")+
+  scale_fill_paletteer_c("grDevices::Red-Yellow", -1, name="Distance")+
+  mapTheme3,
+ncol=3)
 ```
 
 ```{r built environment feature engingeering, warning=FALSE, message=FALSE, results=FALSE}
@@ -2062,11 +2048,6 @@ vars_net <-
 
 # Modeling
 
-```{r}
-ggplot()+
-  geom_sf(data=hex_cleaned)
-  
-```
 
 ```{r}
 ggplot(hex_cleaned, aes(x = ridership, y = prediction)) +
